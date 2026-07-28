@@ -749,7 +749,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ---- PRODUCTION ORDERS (weekly SAP report) ----
-  app.get("/api/production-orders", requireAuth, async (_req, res) => {
+  app.get("/api/production-orders", async (_req, res) => {
     const rows = await sql`SELECT id, row_num as "rowNum", shop_status as "shopStatus", sales_order as "salesOrder", doc_date as "docDate", po_status as "poStatus", material_num as "materialNum", material_desc as "materialDesc", ship_to_party as "shipToParty", city, co, unit, qty, incoterms FROM production_orders ORDER BY id`;
     res.json(rows);
   });
@@ -793,7 +793,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ---- ON-TIME DELIVERY ----
-  app.get("/api/otd", requireAuth, async (req, res) => {
+  app.get("/api/otd", async (req, res) => {
     const year = parseInt(String(req.query.year || new Date().getFullYear()), 10);
     const goalRow = await sql`SELECT goal_percent FROM otd_goals WHERE year=${year}`;
     const monthRows = await sql`SELECT month, percent FROM otd_monthly WHERE year=${year} ORDER BY month`;

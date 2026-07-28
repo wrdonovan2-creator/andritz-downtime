@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { QRCodeSVG } from "qrcode.react";
-import { useDashboard, useDelays, useByReason, useToolbox, useUpcomingBirthdays, useRecentResponses, useOpenConcerns, useHolidays } from "@/lib/hooks";
+import { useDashboard, useDelays, useByReason, useToolbox, useUpcomingBirthdays, useRecentResponses, useOpenConcerns, useHolidays, useProductionOrders, useOtd } from "@/lib/hooks";
 import { useLang } from "@/lib/lang";
 import { fmtMoney, fmtHours, fmtInt } from "@/i18n";
 import { assetUrl } from "@/lib/api";
@@ -56,6 +56,8 @@ export default function Tv() {
   const { data: responses } = useRecentResponses(60000);
   const { data: openConcerns } = useOpenConcerns(30000);
   const { data: allHolidays } = useHolidays();
+  const { data: prodOrders } = useProductionOrders(60000);
+  const { data: otd } = useOtd(new Date().getFullYear(), 60000);
 
   // Birthday slide only appears when someone has a birthday TODAY.
   const hasBirthdayToday = (birthdays ?? []).some((b) => b.isToday);
@@ -95,6 +97,8 @@ export default function Tv() {
     "topAssets",
     "byReason",
     "currentState",
+    "production",
+    "otd",
     "toolbox",
     ...(activeHoliday ? ["holiday"] : []),
     ...(hasBirthdayToday ? ["birthday"] : []),
@@ -339,6 +343,103 @@ export default function Tv() {
         )}
 
         {/* SLIDE 6 — TOOLBOX TALK */}
+        {slide === "production" && (
+          <Slide title={t("tv.productionTitle") || "Production Status"}>
+            {(() => {
+              const rows = prodOrders ?? [];
+              const inProcess = rows.filter((r: any) => r.shopStatus === "IN PROCESS").length;
+              const ready = rows.filter((r: any) => r.shopStatus === "READY").length;
+              const complete = rows.filter((r: any) => r.shopStatus === "COMPLETE").length;
+              const total = rows.length;
+              const readyList = rows.filter((r: any) => r.shopStatus === "READY").slice(0, 8);
+              return (
+                <div>
+                  <div className="grid grid-cols-4 gap-6">
+                    <BigKpi label={t("tv.total") || "Total Orders"} value={String(total)} />
+                    <BigKpi label={t("tv.inProcess") || "In Process"} value={String(inProcess)} tone="primary" />
+                    <BigKpi label={t("tv.ready") || "Ready to Ship"} value={String(ready)} tone={ready > 0 ? "green" : undefined} />
+                    <BigKpi label={t("tv.complete") || "Complete"} value={String(complete)} />
+                  </div>
+                  {readyList.length > 0 && (
+                    <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
+                      <div className="mb-4 text-2xl font-black tracking-tight text-green-400">
+                        {t("tv.readyToShip") || "Ready to Ship"}
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                        {readyList.map((r: any) => (
+                          <div key={r.id} className="flex items-center justify-between text-lg">
+                            <span className="font-bold tabular-nums text-white">{r.salesOrder}</span>
+                            <span className="truncate text-white/70">{r.shipToParty}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </Slide>
+        )}
+
+        {slide === "otd" && (
+          <Slide title={`${new Date().getFullYear()} ${t("tv.otdTitle") || "On-Time Delivery"}`}>
+            {(() => {
+              const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+              const goal = otd?.goal ?? null;
+              const months = otd?.months ?? [];
+              const byMonth: (number | null)[] = Array(12).fill(null);
+              for (const m of months) byMonth[m.month - 1] = m.percent;
+              const actuals = byMonth.filter((v): v is number => v != null && v > 0);
+              const ytd = actuals.length ? Math.round(actuals.reduce((s, v) => s + v, 0) / actuals.length) : null;
+              const maxHeight = 100;
+              return (
+                <div>
+                  <div className="mb-6 grid grid-cols-2 gap-6">
+                    <BigKpi
+                      label={t("tv.goal") || "Goal"}
+                      value={goal != null ? `${Math.round(goal)}%` : "—"}
+                      tone="primary"
+                    />
+                    <BigKpi
+                      label={t("tv.ytdActual") || "YTD Actual"}
+                      value={ytd != null ? `${ytd}%` : "—"}
+                      tone={goal != null && ytd != null ? (ytd >= goal ? "green" : "danger") : undefined}
+                    />
+                  </div>
+                  <div className="relative flex h-72 items-end gap-2 rounded-2xl border border-white/10 bg-white/5 p-6">
+                    {byMonth.map((v, i) => {
+                      const heightPct = v == null ? 0 : Math.max(0, Math.min(100, (v / maxHeight) * 100));
+                      const meetsGoal = goal != null && v != null && v >= goal;
+                      return (
+                        <div key={i} className="flex flex-1 flex-col items-center justify-end">
+                          <div className="mb-1 text-base font-bold tabular-nums text-white">
+                            {v == null || v === 0 ? "" : `${Math.round(v)}%`}
+                          </div>
+                          <div
+                            className={`w-3/4 rounded-t ${meetsGoal ? "bg-green-400" : v != null && v > 0 ? "bg-sky-400" : "bg-white/10"}`}
+                            style={{ height: `${heightPct}%`, minHeight: v != null && v > 0 ? "4px" : "2px" }}
+                          />
+                          <div className="mt-2 text-sm font-semibold text-white/60">{monthLabels[i]}</div>
+                        </div>
+                      );
+                    })}
+                    {goal != null && (
+                      <div
+                        className="pointer-events-none absolute left-6 right-6 border-t-2 border-dashed border-yellow-400"
+                        style={{ bottom: `calc(1.5rem + ${(goal / maxHeight) * (18 * 16)}px)` }}
+                      >
+                        <div className="absolute -top-6 right-0 rounded bg-yellow-400 px-2 py-0.5 text-xs font-black text-black">
+                          Goal {Math.round(goal)}%
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </Slide>
+        )}
+
         {slide === "toolbox" && (
           <Slide title={t("tv.toolbox")}>
             {toolbox && (toolbox.imagePath || toolbox.title || toolbox.notes) ? (

@@ -107,6 +107,22 @@ export function useUpcomingBirthdays(refetchInterval?: number) {
     refetchInterval,
   });
 }
+export function useProductionOrders(refetchInterval?: number) {
+  return useQuery<any[]>({
+    queryKey: ["/api/production-orders"],
+    queryFn: jsonGetter("/api/production-orders"),
+    refetchInterval,
+  });
+}
+
+export function useOtd(year: number, refetchInterval?: number) {
+  return useQuery<{ year: number; goal: number | null; months: { month: number; percent: number | null }[] }>({
+    queryKey: ["/api/otd", year],
+    queryFn: jsonGetter(`/api/otd?year=${year}`),
+    refetchInterval,
+  });
+}
+
 export function useToolbox(refetchInterval?: number) {
   return useQuery<ToolboxTalk | null>({
     queryKey: ["/api/toolbox"],
