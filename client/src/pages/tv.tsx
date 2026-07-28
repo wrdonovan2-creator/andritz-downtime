@@ -90,6 +90,9 @@ export default function Tv() {
   })();
 
   // Build an ordered list of slide keys. Static slides + conditional dynamic ones.
+  const inProcessCount = (prodOrders ?? []).filter((r: any) => r.shopStatus === "IN PROCESS").length;
+  const productionPageCount = Math.max(1, Math.ceil(inProcessCount / 12));
+
   const activeSlides: string[] = [
     "greeting",
     "status",
@@ -97,7 +100,7 @@ export default function Tv() {
     "topAssets",
     "byReason",
     "currentState",
-    "production",
+    ...Array.from({ length: productionPageCount }, (_, i) => `production:${i}`),
     "otd",
     "toolbox",
     ...(activeHoliday ? ["holiday"] : []),
@@ -343,63 +346,78 @@ export default function Tv() {
         )}
 
         {/* SLIDE 6 — TOOLBOX TALK */}
-        {slide === "production" && (
-          <Slide title={t("tv.productionTitle") || "Production Status"}>
-            {(() => {
-              const rows = prodOrders ?? [];
-              const inProcessAll = rows.filter((r: any) => r.shopStatus === "IN PROCESS");
-              const readyAll = rows.filter((r: any) => r.shopStatus === "READY");
-              const complete = rows.filter((r: any) => r.shopStatus === "COMPLETE").length;
-              const total = rows.length;
-              const inProcessList = inProcessAll.slice(0, 14);
-              const readyList = readyAll.slice(0, 14);
-              return (
-                <div>
-                  <div className="grid grid-cols-4 gap-4">
-                    <BigKpi label={t("tv.total") || "Total Orders"} value={String(total)} />
-                    <BigKpi label={t("tv.inProcess") || "In Process"} value={String(inProcessAll.length)} tone="primary" />
-                    <BigKpi label={t("tv.ready") || "Ready to Ship"} value={String(readyAll.length)} tone={readyAll.length > 0 ? "green" : undefined} />
-                    <BigKpi label={t("tv.complete") || "Complete"} value={String(complete)} />
-                  </div>
-                  <div className="mt-6 grid grid-cols-2 gap-4">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                      <div className="mb-3 text-xl font-black tracking-tight text-primary">
+        {slide.startsWith("production:") && (() => {
+          const pageIdx = parseInt(slide.split(":")[1] || "0", 10);
+          const rows = prodOrders ?? [];
+          const inProcessAll = rows.filter((r: any) => r.shopStatus === "IN PROCESS");
+          const readyAll = rows.filter((r: any) => r.shopStatus === "READY");
+          const complete = rows.filter((r: any) => r.shopStatus === "COMPLETE").length;
+          const total = rows.length;
+          const perPage = 12;
+          const pageStart = pageIdx * perPage;
+          const inProcessPage = inProcessAll.slice(pageStart, pageStart + perPage);
+          const readyList = readyAll.slice(0, 12);
+          const totalPages = productionPageCount;
+          const pageSuffix = totalPages > 1 ? ` (${pageIdx + 1}/${totalPages})` : "";
+          return (
+            <Slide title={(t("tv.productionTitle") || "Production Status") + pageSuffix}>
+              <div>
+                <div className="grid grid-cols-4 gap-4">
+                  <BigKpi label={t("tv.total") || "Total Orders"} value={String(total)} />
+                  <BigKpi label={t("tv.inProcess") || "In Process"} value={String(inProcessAll.length)} tone="primary" />
+                  <BigKpi label={t("tv.ready") || "Ready to Ship"} value={String(readyAll.length)} tone={readyAll.length > 0 ? "green" : undefined} />
+                  <BigKpi label={t("tv.complete") || "Complete"} value={String(complete)} />
+                </div>
+                <div className="mt-6 grid grid-cols-2 gap-4">
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                    <div className="mb-3 flex items-baseline justify-between">
+                      <div className="text-xl font-black tracking-tight text-primary">
                         {t("tv.inProcess") || "In Process"} ({inProcessAll.length})
                       </div>
-                      <div className="space-y-1.5">
-                        {inProcessList.map((r: any) => (
-                          <div key={r.id} className="flex items-center justify-between text-base leading-tight">
-                            <span className="font-bold tabular-nums text-white">{r.salesOrder}</span>
-                            <span className="ml-3 truncate text-white/60">{r.shipToParty}</span>
-                          </div>
-                        ))}
-                        {inProcessAll.length > inProcessList.length && (
-                          <div className="pt-2 text-sm text-white/40">+ {inProcessAll.length - inProcessList.length} more</div>
-                        )}
-                      </div>
+                      {totalPages > 1 && (
+                        <div className="text-sm font-semibold text-white/40">
+                          {pageStart + 1}–{Math.min(pageStart + perPage, inProcessAll.length)} of {inProcessAll.length}
+                        </div>
+                      )}
                     </div>
-                    <div className="rounded-2xl border border-green-400/30 bg-green-400/10 p-5">
-                      <div className="mb-3 text-xl font-black tracking-tight text-green-400">
-                        {t("tv.readyToShip") || "Ready to Ship"} ({readyAll.length})
-                      </div>
-                      <div className="space-y-1.5">
-                        {readyList.map((r: any) => (
-                          <div key={r.id} className="flex items-center justify-between text-base leading-tight">
-                            <span className="font-bold tabular-nums text-white">{r.salesOrder}</span>
-                            <span className="ml-3 truncate text-white/60">{r.shipToParty}</span>
-                          </div>
-                        ))}
-                        {readyAll.length === 0 && (
-                          <div className="text-sm text-white/40">No orders ready.</div>
-                        )}
-                      </div>
+                    <div className="space-y-1">
+                      {inProcessPage.map((r: any) => (
+                        <div key={r.id} className="grid grid-cols-[auto_1fr_auto] items-baseline gap-2 text-[15px] leading-tight">
+                          <span className="font-bold tabular-nums text-white">{r.salesOrder}</span>
+                          <span className="truncate text-white/60">
+                            {r.shipToParty}
+                            {r.city ? <span className="text-white/40"> — {r.city}</span> : null}
+                          </span>
+                          <span className="tabular-nums font-semibold text-white/70">{r.qty}{r.unit ? <span className="text-white/40"> {r.unit}</span> : null}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-green-400/30 bg-green-400/10 p-5">
+                    <div className="mb-3 text-xl font-black tracking-tight text-green-400">
+                      {t("tv.readyToShip") || "Ready to Ship"} ({readyAll.length})
+                    </div>
+                    <div className="space-y-1">
+                      {readyList.map((r: any) => (
+                        <div key={r.id} className="grid grid-cols-[auto_1fr_auto] items-baseline gap-2 text-[15px] leading-tight">
+                          <span className="font-bold tabular-nums text-white">{r.salesOrder}</span>
+                          <span className="truncate text-white/60">
+                            {r.shipToParty}
+                            {r.city ? <span className="text-white/40"> — {r.city}</span> : null}
+                          </span>
+                          <span className="tabular-nums font-semibold text-white/70">{r.qty}{r.unit ? <span className="text-white/40"> {r.unit}</span> : null}</span>
+                        </div>
+                      ))}
+                      {readyAll.length === 0 && (
+                        <div className="text-sm text-white/40">No orders ready.</div>
+                      )}
                     </div>
                   </div>
                 </div>
-              );
-            })()}
-          </Slide>
-        )}
+              </div>
+            </Slide>
+          );
+        })()}
 
         {slide === "otd" && (
           <Slide title={`${new Date().getFullYear()} ${t("tv.otdTitle") || "On-Time Delivery"}`}>
