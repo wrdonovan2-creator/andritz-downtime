@@ -164,33 +164,35 @@ export function Shell({ children }: { children: ReactNode }) {
       </header>
 
       {/* Content */}
-      <main className="pb-24 md:ml-64 md:pb-0">
+      <main className="pb-32 md:ml-64 md:pb-0">
         <div className="mx-auto max-w-7xl p-4 sm:p-6">{children}</div>
       </main>
 
       {/* Emergency Request Help button — fixed, floats above content on every logged-in page. */}
       <RequestHelpButton />
 
-      {/* Mobile bottom nav */}
-      <nav className={cn("fixed inset-x-0 bottom-0 z-30 grid border-t border-border bg-sidebar md:hidden", gridCols)}>
-        {nav.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              data-testid={`bottomnav-${item.key}`}
-              className={cn(
-                "flex min-h-[60px] flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] font-medium",
-                active ? "text-primary" : "text-muted-foreground"
-              )}
-            >
-              <Icon className="h-5 w-5" />
-              <span className="leading-none">{t(`nav.${item.key}`)}</span>
-            </Link>
-          );
-        })}
+      {/* Mobile bottom nav — horizontally scrollable so 6-8 items don't get squished */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-sidebar md:hidden">
+        <div className="flex overflow-x-auto scrollbar-none">
+          {nav.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                data-testid={`bottomnav-${item.key}`}
+                className={cn(
+                  "flex min-h-[60px] min-w-[72px] flex-1 shrink-0 flex-col items-center justify-center gap-0.5 px-2 py-2 text-[10px] font-medium",
+                  active ? "text-primary" : "text-muted-foreground"
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="whitespace-nowrap leading-none">{t(`nav.${item.key}`)}</span>
+              </Link>
+            );
+          })}
+        </div>
       </nav>
     </div>
   );

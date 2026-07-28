@@ -11,6 +11,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Save, Loader2 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LabelList, Cell, ReferenceLine,
+} from "recharts";
 
 type OtdData = {
   year: number;
@@ -52,13 +56,26 @@ export default function Otd() {
     }
   }, [data]);
 
+  const goalNum = goalInput.trim() === "" ? null : parseFloat(goalInput);
+
   const yearActual = useMemo(() => {
     const vals = monthInputs.map(parseFloat).filter((v) => !isNaN(v) && v > 0);
     if (vals.length === 0) return null;
     return Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
   }, [monthInputs]);
 
-  const maxHeight = 100;
+  const yy = String(year).slice(2);
+
+  const chartData = useMemo(() => {
+    const rows: { name: string; value: number; isGoal?: boolean; isYtd?: boolean }[] = [];
+    rows.push({ name: `${year} Goal`, value: goalNum ?? 0, isGoal: true });
+    rows.push({ name: `${yy} YTD`, value: yearActual ?? 0, isYtd: true });
+    for (let i = 0; i < 12; i++) {
+      const v = monthInputs[i].trim() === "" ? 0 : parseFloat(monthInputs[i]);
+      rows.push({ name: `${yy}-${MONTH_LABELS[i]}`, value: isNaN(v) ? 0 : v });
+    }
+    return rows;
+  }, [year, yy, goalNum, yearActual, monthInputs]);
 
   async function handleSave() {
     setSaving(true);
@@ -106,48 +123,74 @@ export default function Otd() {
           {isLoading ? (
             <Skeleton className="h-96 w-full" />
           ) : (
-            <div className="w-full overflow-x-auto">
-              <div className="min-w-[900px]">
-                {/* Chart area */}
-                <div className="relative flex h-96 items-end gap-2 border-b border-l pb-2 pl-8 pr-2">
-                  {/* Y-axis labels */}
-                  <div className="absolute left-0 top-0 flex h-full flex-col-reverse justify-between pb-2 text-xs text-muted-foreground">
-                    {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((v) => (
-                      <div key={v} className="flex items-center gap-1">
-                        <span className="w-6 text-right">{v}%</span>
-                        <div className="h-px w-2 bg-border" />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Bars */}
-                  {/* Goal bar */}
-                  <BarColumn
-                    label={`${year} Goal`}
-                    value={goalInput.trim() === "" ? null : parseFloat(goalInput)}
-                    color="bg-blue-800"
-                    maxHeight={maxHeight}
+            <div className="w-full">
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 24, right: 8, left: 0, bottom: 60 }}
+                  barCategoryGap="15%"
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    interval={0}
+                    angle={-45}
+                    textAnchor="end"
+                    height={70}
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                   />
-                  {/* YTD actual */}
-                  <BarColumn
-                    label={`${String(year).slice(2)} YTD ACT`}
-                    value={yearActual}
-                    color="bg-sky-400"
-                    maxHeight={maxHeight}
+                  <YAxis
+                    domain={[0, 100]}
+                    ticks={[0, 20, 40, 60, 80, 100]}
+                    tickFormatter={(v) => `${v}%`}
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    width={40}
                   />
-                  {/* Monthly bars */}
-                  {MONTH_LABELS.map((m, i) => {
-                    const val = monthInputs[i].trim() === "" ? null : parseFloat(monthInputs[i]);
-                    return (
-                      <BarColumn
-                        key={m}
-                        label={`${String(year).slice(2)}-${m}`}
-                        value={val}
-                        color="bg-sky-400"
-                        maxHeight={maxHeight}
+                  <Tooltip
+                    contentStyle={{
+                      background: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                    formatter={(v: number) => [`${Math.round(v)}%`, "OTD"]}
+                  />
+                  {goalNum != null && (
+                    <ReferenceLine
+                      y={goalNum}
+                      stroke="#1e40af"
+                      strokeDasharray="4 4"
+                      strokeWidth={1.5}
+                    />
+                  )}
+                  <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+                    {chartData.map((row, idx) => (
+                      <Cell
+                        key={idx}
+                        fill={row.isGoal ? "#1e40af" : row.isYtd ? "#0284c7" : "#38bdf8"}
                       />
-                    );
-                  })}
+                    ))}
+                    <LabelList
+                      dataKey="value"
+                      position="top"
+                      formatter={(v: number) => (v > 0 ? `${Math.round(v)}%` : "")}
+                      style={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--foreground))" }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#1e40af" }} />
+                  <span>{year} Goal</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#0284c7" }} />
+                  <span>{yy} YTD</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 rounded-sm" style={{ background: "#38bdf8" }} />
+                  <span>Monthly Actual</span>
                 </div>
               </div>
             </div>
@@ -173,7 +216,7 @@ export default function Otd() {
                 data-testid="input-goal"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
               {MONTH_LABELS.map((m, i) => (
                 <div key={m}>
                   <Label htmlFor={`m-${i}`}>{m}</Label>
@@ -202,38 +245,6 @@ export default function Otd() {
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-}
-
-function BarColumn({
-  label,
-  value,
-  color,
-  maxHeight,
-}: {
-  label: string;
-  value: number | null;
-  color: string;
-  maxHeight: number;
-}) {
-  const heightPct = value == null ? 0 : Math.max(0, Math.min(100, (value / maxHeight) * 100));
-  return (
-    <div className="flex flex-1 flex-col items-center gap-1">
-      <div className="relative flex h-full w-full items-end justify-center">
-        <div
-          className={`w-3/4 rounded-t ${color} transition-all`}
-          style={{ height: `${heightPct}%` }}
-          title={value == null ? "0%" : `${value}%`}
-        >
-          <div className="-mt-6 text-center text-xs font-bold">
-            {value == null ? "0%" : `${Math.round(value)}%`}
-          </div>
-        </div>
-      </div>
-      <div className="whitespace-nowrap text-xs text-muted-foreground" style={{ transform: "rotate(-35deg)", transformOrigin: "top left", marginLeft: "50%", marginTop: "6px" }}>
-        {label}
-      </div>
     </div>
   );
 }
