@@ -443,61 +443,77 @@ export default function Tv() {
                       tone={goal != null && ytd != null ? (ytd >= goal ? "green" : "danger") : undefined}
                     />
                   </div>
-                  {/* Chart: fixed pixel plot area so bar heights and goal line line up */}
+                  {/* Chart: bars, gridlines and goal line all share the same 300px plot area */}
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-                    <div className="relative" style={{ height: "340px" }}>
-                      {/* Y-axis gridlines (0/20/40/60/80/100) */}
-                      {[0, 20, 40, 60, 80, 100].map((y) => (
-                        <div
-                          key={y}
-                          className="absolute left-8 right-2 border-t border-white/5"
-                          style={{ bottom: `${(y / 100) * 300}px` }}
-                        >
-                          <span className="absolute -left-8 -top-2.5 w-7 text-right text-xs text-white/40">
-                            {y}%
-                          </span>
-                        </div>
-                      ))}
-                      {/* Goal reference line */}
-                      {goal != null && (
-                        <div
-                          className="absolute left-8 right-2 border-t-2 border-dashed border-yellow-400"
-                          style={{ bottom: `${(goal / 100) * 300}px` }}
-                        >
-                          <div className="absolute -top-3.5 right-0 rounded bg-yellow-400 px-2 py-0.5 text-xs font-black text-black">
-                            Goal {Math.round(goal)}%
+                    {(() => {
+                      const PLOT_PX = 300;    // 0-100% maps to 0-300px
+                      const X_LABEL_PX = 24;  // room below plot for Jan/Feb/... labels
+                      return (
+                        <div className="relative" style={{ height: `${PLOT_PX + X_LABEL_PX}px` }}>
+                          {/* Plot area (anchored to top of x-axis labels) */}
+                          <div
+                            className="absolute left-8 right-2"
+                            style={{ bottom: `${X_LABEL_PX}px`, height: `${PLOT_PX}px` }}
+                          >
+                            {/* Y-axis gridlines */}
+                            {[0, 20, 40, 60, 80, 100].map((y) => (
+                              <div
+                                key={y}
+                                className="absolute left-0 right-0 border-t border-white/5"
+                                style={{ bottom: `${(y / 100) * PLOT_PX}px` }}
+                              >
+                                <span className="absolute -left-8 -top-2.5 w-7 text-right text-xs text-white/40">
+                                  {y}%
+                                </span>
+                              </div>
+                            ))}
+                            {/* Goal reference line */}
+                            {goal != null && (
+                              <div
+                                className="absolute left-0 right-0 border-t-2 border-dashed border-yellow-400"
+                                style={{ bottom: `${(goal / 100) * PLOT_PX}px` }}
+                              >
+                                <div className="absolute -top-3.5 right-0 rounded bg-yellow-400 px-2 py-0.5 text-xs font-black text-black">
+                                  Goal {Math.round(goal)}%
+                                </div>
+                              </div>
+                            )}
+                            {/* Bars — each column is the full plot height, bar grows from bottom */}
+                            <div className="absolute inset-0 flex items-end justify-between">
+                              {byMonth.map((v, i) => {
+                                const hasVal = v != null && v > 0;
+                                const barPx = hasVal ? (v / 100) * PLOT_PX : 0;
+                                const meetsGoal = goal != null && hasVal && v >= goal;
+                                return (
+                                  <div key={i} className="flex flex-1 flex-col items-center justify-end" style={{ height: `${PLOT_PX}px` }}>
+                                    {hasVal && (
+                                      <div className="text-sm font-bold tabular-nums text-white" style={{ marginBottom: "2px" }}>
+                                        {Math.round(v!)}%
+                                      </div>
+                                    )}
+                                    <div
+                                      className={`w-3/5 rounded-t ${meetsGoal ? "bg-green-400" : hasVal ? "bg-sky-400" : "bg-white/10"}`}
+                                      style={{ height: `${Math.max(barPx, hasVal ? 4 : 2)}px` }}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          {/* X-axis month labels, aligned to the same column layout */}
+                          <div
+                            className="absolute left-8 right-2 flex items-start justify-between"
+                            style={{ bottom: 0, height: `${X_LABEL_PX}px` }}
+                          >
+                            {monthLabels.map((m, i) => (
+                              <div key={i} className="flex flex-1 justify-center text-sm font-semibold text-white/60">
+                                {m}
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      )}
-                      {/* Bars container: 300px tall plot area starting at bottom 20px (leaves room for labels) */}
-                      <div className="absolute bottom-0 left-8 right-2 flex items-end justify-between" style={{ height: "320px" }}>
-                        {byMonth.map((v, i) => {
-                          const hasVal = v != null && v > 0;
-                          const barPx = hasVal ? (v / 100) * 300 : 0;
-                          const meetsGoal = goal != null && hasVal && v >= goal;
-                          return (
-                            <div key={i} className="flex flex-1 flex-col items-center" style={{ height: "320px" }}>
-                              {/* value label + bar sit at bottom */}
-                              <div className="mt-auto flex w-full flex-col items-center">
-                                {hasVal && (
-                                  <div
-                                    className="mb-1 text-sm font-bold tabular-nums text-white"
-                                    style={{ marginBottom: "2px" }}
-                                  >
-                                    {Math.round(v!)}%
-                                  </div>
-                                )}
-                                <div
-                                  className={`w-3/5 rounded-t ${meetsGoal ? "bg-green-400" : hasVal ? "bg-sky-400" : "bg-white/10"}`}
-                                  style={{ height: `${Math.max(barPx, hasVal ? 4 : 2)}px` }}
-                                />
-                              </div>
-                              <div className="mt-1 text-sm font-semibold text-white/60">{monthLabels[i]}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+                      );
+                    })()}
                   </div>
                 </div>
               );
