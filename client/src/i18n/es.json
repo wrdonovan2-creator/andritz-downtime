@@ -4,9 +4,36 @@
     "subtitle": "Rastreador de Paros",
     "company": "ANDRITZ METALS — V403 South Holland, IL"
   },
+  "production": {
+    "title": "Estado de Producción",
+    "subtitle": "Órdenes de venta abiertas semanales",
+    "import": "Actualizar desde Excel",
+    "pasteTitle": "Pegue sus datos de Excel",
+    "pasteHint": "Copie toda la cuadrícula de su hoja Excel y péguela abajo. Las órdenes existentes serán reemplazadas.",
+    "pastePlaceholder": "Pegue datos separados por tabulaciones aquí...",
+    "replaceAll": "Reemplazar todas",
+    "total": "Total",
+    "searchPlaceholder": "Buscar SO#, material, cliente, ciudad...",
+    "noOrders": "Ninguna orden coincide con el filtro."
+  },
+  "otd": {
+    "title": "Entrega a Tiempo",
+    "subtitle": "Rendimiento mensual vs. meta",
+    "year": "Año",
+    "editTitle": "Editar valores",
+    "goalPercent": "Meta %",
+    "save": "Guardar",
+    "saved": "Guardado",
+    "saveFailed": "Error al guardar"
+  },
+  "common": {
+    "cancel": "Cancelar"
+  },
   "nav": {
     "dashboard": "Panel",
     "log": "Registro de Paros",
+    "production": "Producción",
+    "otd": "Entrega a Tiempo",
     "weekly": "Semanal",
     "reason": "Por Motivo",
     "status": "Estado",

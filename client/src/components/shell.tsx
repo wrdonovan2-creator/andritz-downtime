@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard, ClipboardList, CalendarDays, PieChart,
-  SignalHigh, Settings, LogOut, Sun, Moon,
+  SignalHigh, Settings, LogOut, Sun, Moon, Package, BarChart3,
 } from "lucide-react";
 import { useAuth, isManager } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
@@ -59,6 +59,8 @@ const NAV = [
   { href: "/weekly", key: "weekly", icon: CalendarDays },
   { href: "/reason", key: "reason", icon: PieChart },
   { href: "/status", key: "status", icon: SignalHigh },
+  { href: "/production", key: "production", icon: Package },
+  { href: "/otd", key: "otd", icon: BarChart3 },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -78,7 +80,10 @@ export function Shell({ children }: { children: ReactNode }) {
   const isActive = (href: string) =>
     href === "/" ? location === "/" : location.startsWith(href);
 
-  const gridCols = nav.length === 6 ? "grid-cols-6" : "grid-cols-5";
+  const gridCols =
+    nav.length >= 8 ? "grid-cols-8" :
+    nav.length === 7 ? "grid-cols-7" :
+    nav.length === 6 ? "grid-cols-6" : "grid-cols-5";
 
   return (
     <div className="min-h-screen bg-background text-foreground">

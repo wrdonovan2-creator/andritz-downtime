@@ -18,6 +18,7 @@ if (!process.env.DATABASE_URL) {
   console.warn("[db] DATABASE_URL is not set — database calls will fail until it is configured in Vercel env vars.");
 }
 const sql = neon(process.env.DATABASE_URL || "");
+export { sql };
 export const db = drizzle(sql);
 
 // Table creation is handled by `drizzle-kit push` (see package.json db:push /

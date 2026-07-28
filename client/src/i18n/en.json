@@ -10,8 +10,35 @@
     "weekly": "Weekly",
     "reason": "By Reason",
     "status": "Status",
+    "production": "Production",
+    "otd": "On-Time Delivery",
     "admin": "Admin",
     "logout": "Logout"
+  },
+  "production": {
+    "title": "Production Status",
+    "subtitle": "Weekly open sales orders",
+    "import": "Update from Excel",
+    "pasteTitle": "Paste your Excel data",
+    "pasteHint": "Copy the whole grid from your Excel sheet (Ctrl+A then Ctrl+C in Excel) and paste it below. Existing orders will be replaced.",
+    "pastePlaceholder": "Paste tab-separated data here...",
+    "replaceAll": "Replace all orders",
+    "total": "Total",
+    "searchPlaceholder": "Search SO#, material, customer, city...",
+    "noOrders": "No orders match your filter."
+  },
+  "otd": {
+    "title": "On-Time Delivery",
+    "subtitle": "Monthly delivery performance vs. goal",
+    "year": "Year",
+    "editTitle": "Edit values",
+    "goalPercent": "Goal %",
+    "save": "Save",
+    "saved": "Saved",
+    "saveFailed": "Save failed"
+  },
+  "common": {
+    "cancel": "Cancel"
   },
   "roles": {
     "operator": "Operator",

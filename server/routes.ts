@@ -4,7 +4,7 @@ import type {} from "express-session"; // needed for the SessionData augmentatio
 import bcrypt from "bcryptjs";
 import ExcelJS from "exceljs";
 import multer from "multer";
-import { storage, bootstrap } from "./storage";
+import { storage, bootstrap, sql } from "./storage";
 
 // ---- downtime math ----
 function parseDateTime(date: string, time: string): number | null {
@@ -745,6 +745,83 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
   app.delete("/api/birthdays/:id", requireRole("plant_manager"), async (req, res) => {
     await storage.deleteBirthday(parseInt(req.params.id, 10));
+    res.json({ ok: true });
+  });
+
+  // ---- PRODUCTION ORDERS (weekly SAP report) ----
+  app.get("/api/production-orders", requireAuth, async (_req, res) => {
+    const rows = await sql`SELECT id, row_num as "rowNum", shop_status as "shopStatus", sales_order as "salesOrder", doc_date as "docDate", po_status as "poStatus", material_num as "materialNum", material_desc as "materialDesc", ship_to_party as "shipToParty", city, co, unit, qty, incoterms FROM production_orders ORDER BY id`;
+    res.json(rows);
+  });
+
+  app.post("/api/production-orders/import", requireRole(MANAGERS), async (req, res) => {
+    const text: string = (req.body?.text || "").trim();
+    if (!text) return res.status(400).json({ message: "No paste content." });
+    const lines = text.split(/\r?\n/).filter((l) => l.trim());
+    const parsed: any[] = [];
+    // Try tab-separated first (Excel copy), fall back to whitespace
+    for (const line of lines) {
+      const cells = line.includes("\t") ? line.split("\t") : line.split(/\s{2,}/);
+      if (cells.length < 8) continue;
+      const first = cells[0].trim();
+      const rowNum = /^\d+$/.test(first) ? parseInt(first, 10) : null;
+      if (rowNum == null) continue;
+      const shopStatus = (cells[1] || "").trim();
+      if (!["IN PROCESS", "READY", "COMPLETE"].includes(shopStatus)) continue;
+      parsed.push({
+        rowNum,
+        shopStatus,
+        salesOrder: (cells[2] || "").trim(),
+        docDate: (cells[3] || "").trim(),
+        poStatus: (cells[4] || "").trim().toUpperCase(),
+        materialNum: (cells[5] || "").trim(),
+        materialDesc: (cells[6] || "").trim(),
+        shipToParty: (cells[7] || "").trim(),
+        city: (cells[8] || "").trim(),
+        co: (cells[9] || "").trim(),
+        unit: (cells[10] || "").trim(),
+        qty: parseInt((cells[11] || "0").trim(), 10) || 0,
+        incoterms: (cells[12] || "").trim(),
+      });
+    }
+    if (parsed.length === 0) return res.status(400).json({ message: "Could not parse any rows." });
+    await sql`TRUNCATE production_orders RESTART IDENTITY`;
+    for (const p of parsed) {
+      await sql`INSERT INTO production_orders (row_num, shop_status, sales_order, doc_date, po_status, material_num, material_desc, ship_to_party, city, co, unit, qty, incoterms) VALUES (${p.rowNum}, ${p.shopStatus}, ${p.salesOrder}, ${p.docDate}, ${p.poStatus}, ${p.materialNum}, ${p.materialDesc}, ${p.shipToParty}, ${p.city}, ${p.co}, ${p.unit}, ${p.qty}, ${p.incoterms})`;
+    }
+    res.json({ ok: true, count: parsed.length });
+  });
+
+  // ---- ON-TIME DELIVERY ----
+  app.get("/api/otd", requireAuth, async (req, res) => {
+    const year = parseInt(String(req.query.year || new Date().getFullYear()), 10);
+    const goalRow = await sql`SELECT goal_percent FROM otd_goals WHERE year=${year}`;
+    const monthRows = await sql`SELECT month, percent FROM otd_monthly WHERE year=${year} ORDER BY month`;
+    res.json({
+      year,
+      goal: goalRow[0]?.goal_percent != null ? Number(goalRow[0].goal_percent) : null,
+      months: monthRows.map((r: any) => ({ month: r.month, percent: r.percent != null ? Number(r.percent) : null })),
+    });
+  });
+
+  app.post("/api/otd", requireRole(MANAGERS), async (req, res) => {
+    const year = parseInt(String(req.body?.year || 0), 10);
+    if (!year) return res.status(400).json({ message: "Year required." });
+    const goal = req.body?.goal;
+    const months: { month: number; percent: number | null }[] = req.body?.months || [];
+    if (goal == null) {
+      await sql`DELETE FROM otd_goals WHERE year=${year}`;
+    } else {
+      await sql`INSERT INTO otd_goals (year, goal_percent) VALUES (${year}, ${Number(goal)}) ON CONFLICT (year) DO UPDATE SET goal_percent=EXCLUDED.goal_percent`;
+    }
+    for (const m of months) {
+      if (m.month < 1 || m.month > 12) continue;
+      if (m.percent == null) {
+        await sql`DELETE FROM otd_monthly WHERE year=${year} AND month=${m.month}`;
+      } else {
+        await sql`INSERT INTO otd_monthly (year, month, percent) VALUES (${year}, ${m.month}, ${Number(m.percent)}) ON CONFLICT (year, month) DO UPDATE SET percent=EXCLUDED.percent`;
+      }
+    }
     res.json({ ok: true });
   });
 
