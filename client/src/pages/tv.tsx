@@ -347,34 +347,54 @@ export default function Tv() {
           <Slide title={t("tv.productionTitle") || "Production Status"}>
             {(() => {
               const rows = prodOrders ?? [];
-              const inProcess = rows.filter((r: any) => r.shopStatus === "IN PROCESS").length;
-              const ready = rows.filter((r: any) => r.shopStatus === "READY").length;
+              const inProcessAll = rows.filter((r: any) => r.shopStatus === "IN PROCESS");
+              const readyAll = rows.filter((r: any) => r.shopStatus === "READY");
               const complete = rows.filter((r: any) => r.shopStatus === "COMPLETE").length;
               const total = rows.length;
-              const readyList = rows.filter((r: any) => r.shopStatus === "READY").slice(0, 8);
+              const inProcessList = inProcessAll.slice(0, 14);
+              const readyList = readyAll.slice(0, 14);
               return (
                 <div>
-                  <div className="grid grid-cols-4 gap-6">
+                  <div className="grid grid-cols-4 gap-4">
                     <BigKpi label={t("tv.total") || "Total Orders"} value={String(total)} />
-                    <BigKpi label={t("tv.inProcess") || "In Process"} value={String(inProcess)} tone="primary" />
-                    <BigKpi label={t("tv.ready") || "Ready to Ship"} value={String(ready)} tone={ready > 0 ? "green" : undefined} />
+                    <BigKpi label={t("tv.inProcess") || "In Process"} value={String(inProcessAll.length)} tone="primary" />
+                    <BigKpi label={t("tv.ready") || "Ready to Ship"} value={String(readyAll.length)} tone={readyAll.length > 0 ? "green" : undefined} />
                     <BigKpi label={t("tv.complete") || "Complete"} value={String(complete)} />
                   </div>
-                  {readyList.length > 0 && (
-                    <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-6">
-                      <div className="mb-4 text-2xl font-black tracking-tight text-green-400">
-                        {t("tv.readyToShip") || "Ready to Ship"}
+                  <div className="mt-6 grid grid-cols-2 gap-4">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                      <div className="mb-3 text-xl font-black tracking-tight text-primary">
+                        {t("tv.inProcess") || "In Process"} ({inProcessAll.length})
                       </div>
-                      <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-                        {readyList.map((r: any) => (
-                          <div key={r.id} className="flex items-center justify-between text-lg">
+                      <div className="space-y-1.5">
+                        {inProcessList.map((r: any) => (
+                          <div key={r.id} className="flex items-center justify-between text-base leading-tight">
                             <span className="font-bold tabular-nums text-white">{r.salesOrder}</span>
-                            <span className="truncate text-white/70">{r.shipToParty}</span>
+                            <span className="ml-3 truncate text-white/60">{r.shipToParty}</span>
                           </div>
                         ))}
+                        {inProcessAll.length > inProcessList.length && (
+                          <div className="pt-2 text-sm text-white/40">+ {inProcessAll.length - inProcessList.length} more</div>
+                        )}
                       </div>
                     </div>
-                  )}
+                    <div className="rounded-2xl border border-green-400/30 bg-green-400/10 p-5">
+                      <div className="mb-3 text-xl font-black tracking-tight text-green-400">
+                        {t("tv.readyToShip") || "Ready to Ship"} ({readyAll.length})
+                      </div>
+                      <div className="space-y-1.5">
+                        {readyList.map((r: any) => (
+                          <div key={r.id} className="flex items-center justify-between text-base leading-tight">
+                            <span className="font-bold tabular-nums text-white">{r.salesOrder}</span>
+                            <span className="ml-3 truncate text-white/60">{r.shipToParty}</span>
+                          </div>
+                        ))}
+                        {readyAll.length === 0 && (
+                          <div className="text-sm text-white/40">No orders ready.</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               );
             })()}
@@ -391,7 +411,6 @@ export default function Tv() {
               for (const m of months) byMonth[m.month - 1] = m.percent;
               const actuals = byMonth.filter((v): v is number => v != null && v > 0);
               const ytd = actuals.length ? Math.round(actuals.reduce((s, v) => s + v, 0) / actuals.length) : null;
-              const maxHeight = 100;
               return (
                 <div>
                   <div className="mb-6 grid grid-cols-2 gap-6">
@@ -406,33 +425,61 @@ export default function Tv() {
                       tone={goal != null && ytd != null ? (ytd >= goal ? "green" : "danger") : undefined}
                     />
                   </div>
-                  <div className="relative flex h-72 items-end gap-2 rounded-2xl border border-white/10 bg-white/5 p-6">
-                    {byMonth.map((v, i) => {
-                      const heightPct = v == null ? 0 : Math.max(0, Math.min(100, (v / maxHeight) * 100));
-                      const meetsGoal = goal != null && v != null && v >= goal;
-                      return (
-                        <div key={i} className="flex flex-1 flex-col items-center justify-end">
-                          <div className="mb-1 text-base font-bold tabular-nums text-white">
-                            {v == null || v === 0 ? "" : `${Math.round(v)}%`}
+                  {/* Chart: fixed pixel plot area so bar heights and goal line line up */}
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                    <div className="relative" style={{ height: "340px" }}>
+                      {/* Y-axis gridlines (0/20/40/60/80/100) */}
+                      {[0, 20, 40, 60, 80, 100].map((y) => (
+                        <div
+                          key={y}
+                          className="absolute left-8 right-2 border-t border-white/5"
+                          style={{ bottom: `${(y / 100) * 300}px` }}
+                        >
+                          <span className="absolute -left-8 -top-2.5 w-7 text-right text-xs text-white/40">
+                            {y}%
+                          </span>
+                        </div>
+                      ))}
+                      {/* Goal reference line */}
+                      {goal != null && (
+                        <div
+                          className="absolute left-8 right-2 border-t-2 border-dashed border-yellow-400"
+                          style={{ bottom: `${(goal / 100) * 300}px` }}
+                        >
+                          <div className="absolute -top-3.5 right-0 rounded bg-yellow-400 px-2 py-0.5 text-xs font-black text-black">
+                            Goal {Math.round(goal)}%
                           </div>
-                          <div
-                            className={`w-3/4 rounded-t ${meetsGoal ? "bg-green-400" : v != null && v > 0 ? "bg-sky-400" : "bg-white/10"}`}
-                            style={{ height: `${heightPct}%`, minHeight: v != null && v > 0 ? "4px" : "2px" }}
-                          />
-                          <div className="mt-2 text-sm font-semibold text-white/60">{monthLabels[i]}</div>
                         </div>
-                      );
-                    })}
-                    {goal != null && (
-                      <div
-                        className="pointer-events-none absolute left-6 right-6 border-t-2 border-dashed border-yellow-400"
-                        style={{ bottom: `calc(1.5rem + ${(goal / maxHeight) * (18 * 16)}px)` }}
-                      >
-                        <div className="absolute -top-6 right-0 rounded bg-yellow-400 px-2 py-0.5 text-xs font-black text-black">
-                          Goal {Math.round(goal)}%
-                        </div>
+                      )}
+                      {/* Bars container: 300px tall plot area starting at bottom 20px (leaves room for labels) */}
+                      <div className="absolute bottom-0 left-8 right-2 flex items-end justify-between" style={{ height: "320px" }}>
+                        {byMonth.map((v, i) => {
+                          const hasVal = v != null && v > 0;
+                          const barPx = hasVal ? (v / 100) * 300 : 0;
+                          const meetsGoal = goal != null && hasVal && v >= goal;
+                          return (
+                            <div key={i} className="flex flex-1 flex-col items-center" style={{ height: "320px" }}>
+                              {/* value label + bar sit at bottom */}
+                              <div className="mt-auto flex w-full flex-col items-center">
+                                {hasVal && (
+                                  <div
+                                    className="mb-1 text-sm font-bold tabular-nums text-white"
+                                    style={{ marginBottom: "2px" }}
+                                  >
+                                    {Math.round(v!)}%
+                                  </div>
+                                )}
+                                <div
+                                  className={`w-3/5 rounded-t ${meetsGoal ? "bg-green-400" : hasVal ? "bg-sky-400" : "bg-white/10"}`}
+                                  style={{ height: `${Math.max(barPx, hasVal ? 4 : 2)}px` }}
+                                />
+                              </div>
+                              <div className="mt-1 text-sm font-semibold text-white/60">{monthLabels[i]}</div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               );
