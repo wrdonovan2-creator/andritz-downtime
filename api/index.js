@@ -1557,6 +1557,34 @@ async function registerRoutes(httpServer, app2) {
     }
     res.json({ ok: true });
   });
+  app2.get("/api/productivity", async (_req, res) => {
+    const rows = await sql`SELECT * FROM productivity_kpi WHERE id=1`;
+    const r = rows[0] || {};
+    const n = (v) => v == null ? null : Number(v);
+    res.json({
+      target: n(r.target_percent) ?? 85,
+      ytd: { ope: r.ytd_ope, planned: n(r.ytd_planned), confirmed: n(r.ytd_confirmed), productivity: n(r.ytd_productivity) },
+      l30: { ope: r.l30_ope, planned: n(r.l30_planned), confirmed: n(r.l30_confirmed), productivity: n(r.l30_productivity) },
+      l7: { ope: r.l7_ope, planned: n(r.l7_planned), confirmed: n(r.l7_confirmed), productivity: n(r.l7_productivity) },
+      updatedAt: r.updated_at
+    });
+  });
+  app2.post("/api/productivity", requireRole(MANAGERS), async (req, res) => {
+    const b = req.body || {};
+    const num = (v) => v === "" || v == null || Number.isNaN(Number(v)) ? null : Number(v);
+    const target = num(b.target) ?? 85;
+    const y = b.ytd || {}, m = b.l30 || {}, w = b.l7 || {};
+    await sql`
+      UPDATE productivity_kpi SET
+        target_percent = ${target},
+        ytd_ope = ${num(y.ope)}, ytd_planned = ${num(y.planned)}, ytd_confirmed = ${num(y.confirmed)}, ytd_productivity = ${num(y.productivity)},
+        l30_ope = ${num(m.ope)}, l30_planned = ${num(m.planned)}, l30_confirmed = ${num(m.confirmed)}, l30_productivity = ${num(m.productivity)},
+        l7_ope  = ${num(w.ope)}, l7_planned  = ${num(w.planned)}, l7_confirmed  = ${num(w.confirmed)}, l7_productivity  = ${num(w.productivity)},
+        updated_at = ${(/* @__PURE__ */ new Date()).toISOString()}
+      WHERE id = 1
+    `;
+    res.json({ ok: true });
+  });
   app2.get("/api/distress/active", async (_req, res) => {
     res.json(await storage.listActiveDistressAlerts());
   });

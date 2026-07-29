@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard, ClipboardList, CalendarDays, PieChart,
-  SignalHigh, Settings, LogOut, Sun, Moon, Package, BarChart3,
+  SignalHigh, Settings, LogOut, Sun, Moon, Package, BarChart3, Gauge,
 } from "lucide-react";
 import { useAuth, isManager } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
@@ -61,6 +61,7 @@ const NAV = [
   { href: "/status", key: "status", icon: SignalHigh },
   { href: "/production", key: "production", icon: Package },
   { href: "/otd", key: "otd", icon: BarChart3 },
+  { href: "/productivity", key: "productivity", icon: Gauge },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {

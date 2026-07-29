@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { QRCodeSVG } from "qrcode.react";
-import { useDashboard, useDelays, useByReason, useToolbox, useUpcomingBirthdays, useRecentResponses, useOpenConcerns, useHolidays, useProductionOrders, useOtd } from "@/lib/hooks";
+import { useDashboard, useDelays, useByReason, useToolbox, useUpcomingBirthdays, useRecentResponses, useOpenConcerns, useHolidays, useProductionOrders, useOtd, useProductivity } from "@/lib/hooks";
 import { useLang } from "@/lib/lang";
 import { fmtMoney, fmtHours, fmtInt } from "@/i18n";
 import { assetUrl } from "@/lib/api";
@@ -58,6 +58,7 @@ export default function Tv() {
   const { data: allHolidays } = useHolidays();
   const { data: prodOrders } = useProductionOrders(60000);
   const { data: otd } = useOtd(new Date().getFullYear(), 60000);
+  const { data: productivity } = useProductivity(60000);
 
   // Birthday slide only appears when someone has a birthday TODAY.
   const hasBirthdayToday = (birthdays ?? []).some((b) => b.isToday);
@@ -102,6 +103,7 @@ export default function Tv() {
     "currentState",
     ...Array.from({ length: productionPageCount }, (_, i) => `production:${i}`),
     "otd",
+    "productivity",
     "toolbox",
     ...(activeHoliday ? ["holiday"] : []),
     ...(hasBirthdayToday ? ["birthday"] : []),
@@ -521,6 +523,72 @@ export default function Tv() {
           </Slide>
         )}
 
+        {slide === "productivity" && (
+          <Slide title={t("tv.productivityTitle") || "Productivity"}>
+            {(() => {
+              const target = productivity?.target ?? 85;
+              const ytdPct = productivity?.ytd?.productivity ?? null;
+              const l30Pct = productivity?.l30?.productivity ?? null;
+              const l7Pct  = productivity?.l7?.productivity ?? null;
+              const fmtPct = (v: number | null | undefined) => (v == null ? "—" : `${v.toFixed(1)}%`);
+              const fmtNum = (v: number | null | undefined, digits = 0) => {
+                if (v == null) return "—";
+                return digits === 0 ? Math.round(v).toLocaleString() : v.toFixed(digits);
+              };
+              const meetsTarget = (v: number | null) => v != null && v >= target;
+              return (
+                <div>
+                  <div className="mb-2 text-center text-lg font-semibold uppercase tracking-widest text-white/60">
+                    {t("tv.productivitySubtitle") || "Planned vs. Confirmed DLH"}
+                  </div>
+                  {/* Top row: Target vs YTD Actual (matches OTD slide style) */}
+                  <div className="mb-6 grid grid-cols-2 gap-6">
+                    <BigKpi
+                      label={t("tv.productivityTarget") || "Target"}
+                      value={`${target.toFixed(0)}%`}
+                      tone="primary"
+                    />
+                    <BigKpi
+                      label={t("tv.productivityYtd") || "YTD Actual"}
+                      value={fmtPct(ytdPct)}
+                      tone={ytdPct != null ? (meetsTarget(ytdPct) ? "green" : "danger") : undefined}
+                    />
+                  </div>
+                  {/* Bottom row: three period cards */}
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      { key: "ytd", label: t("tv.productivityYtdShort") || "YTD", p: productivity?.ytd, pct: ytdPct },
+                      { key: "l30", label: t("tv.productivityL30") || "LAST 30 DAYS", p: productivity?.l30, pct: l30Pct },
+                      { key: "l7",  label: t("tv.productivityL7")  || "LAST 7 DAYS",  p: productivity?.l7,  pct: l7Pct },
+                    ].map((col) => {
+                      const good = meetsTarget(col.pct);
+                      const pctColor = col.pct == null ? "text-white" : good ? "text-green-400" : "text-red-400";
+                      return (
+                        <div key={col.key} className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                          <div className="mb-3 rounded-md bg-primary/20 py-2 text-center text-lg font-black uppercase tracking-widest text-primary">
+                            {col.label}
+                          </div>
+                          <div className="space-y-2">
+                            <MiniStat label="# CNF OPEs"     value={fmtNum(col.p?.ope ?? null, 0)} />
+                            <MiniStat label="Planned DLH"    value={fmtNum(col.p?.planned ?? null, 1)} suffix="h" />
+                            <MiniStat label="Confirmed DLH"  value={fmtNum(col.p?.confirmed ?? null, 1)} suffix="h" />
+                          </div>
+                          <div className={`mt-4 rounded-xl border-2 ${good ? "border-green-400/60 bg-green-400/10" : col.pct != null ? "border-red-400/60 bg-red-400/10" : "border-white/10 bg-white/5"} p-3 text-center`}>
+                            <div className="text-xs font-semibold uppercase tracking-widest text-white/60">Productivity</div>
+                            <div className={`mt-1 text-4xl font-black tabular-nums ${pctColor}`}>
+                              {fmtPct(col.pct)}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </Slide>
+        )}
+
         {slide === "toolbox" && (
           <Slide title={t("tv.toolbox")}>
             {toolbox && (toolbox.imagePath || toolbox.title || toolbox.notes) ? (
@@ -695,6 +763,17 @@ function BigKpi({ label, value, tone }: { label: string; value: string; tone?: "
 
 function Empty({ text }: { text: string }) {
   return <div className="flex h-64 items-center justify-center text-2xl font-bold text-green-400">{text}</div>;
+}
+
+function MiniStat({ label, value, suffix }: { label: string; value: string; suffix?: string }) {
+  return (
+    <div className="flex items-baseline justify-between rounded-md border border-white/10 bg-black/20 px-3 py-2">
+      <span className="text-xs font-semibold uppercase tracking-widest text-white/60">{label}</span>
+      <span className="text-xl font-black tabular-nums text-white">
+        {value}{suffix ? <span className="ml-0.5 text-sm text-white/60">{suffix}</span> : null}
+      </span>
+    </div>
+  );
 }
 
 // Metallic live digital clock — brushed-steel look with cool blue LED glow

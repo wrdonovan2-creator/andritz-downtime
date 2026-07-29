@@ -123,6 +123,27 @@ export function useOtd(year: number, refetchInterval?: number) {
   });
 }
 
+export interface ProductivityPeriod {
+  ope: number | null;
+  planned: number | null;
+  confirmed: number | null;
+  productivity: number | null;
+}
+export interface ProductivityKpi {
+  target: number;
+  ytd: ProductivityPeriod;
+  l30: ProductivityPeriod;
+  l7: ProductivityPeriod;
+  updatedAt: string | null;
+}
+export function useProductivity(refetchInterval?: number) {
+  return useQuery<ProductivityKpi>({
+    queryKey: ["/api/productivity"],
+    queryFn: jsonGetter("/api/productivity"),
+    refetchInterval,
+  });
+}
+
 export function useToolbox(refetchInterval?: number) {
   return useQuery<ToolboxTalk | null>({
     queryKey: ["/api/toolbox"],

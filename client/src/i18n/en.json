@@ -12,6 +12,7 @@
     "status": "Status",
     "production": "Production",
     "otd": "On-Time Delivery",
+    "productivity": "Productivity",
     "admin": "Admin",
     "logout": "Logout"
   },
@@ -36,6 +37,23 @@
     "save": "Save",
     "saved": "Saved",
     "saveFailed": "Save failed"
+  },
+  "productivity": {
+    "title": "Productivity",
+    "subtitle": "Planned vs. Confirmed DLH from Celonis Cockpit",
+    "editTitle": "Edit values",
+    "target": "Target %",
+    "ytd": "YTD",
+    "l30": "Last 30 Days",
+    "l7": "Last 7 Days",
+    "ope": "# CNF OPEs",
+    "planned": "Planned DLH",
+    "confirmed": "Confirmed DLH",
+    "pct": "Productivity %",
+    "save": "Save",
+    "saved": "Saved",
+    "saveFailed": "Save failed",
+    "lastUpdated": "Last updated"
   },
   "common": {
     "cancel": "Cancel"
@@ -271,6 +289,13 @@
     "otdTitle": "ON-TIME DELIVERY",
     "goal": "Goal",
     "ytdActual": "YTD Actual",
+    "productivityTitle": "PRODUCTIVITY",
+    "productivitySubtitle": "Planned vs. Confirmed DLH",
+    "productivityTarget": "Target",
+    "productivityYtd": "YTD Actual",
+    "productivityL30": "LAST 30 DAYS",
+    "productivityL7": "LAST 7 DAYS",
+    "productivityYtdShort": "YTD",
     "toolboxEmpty": "This week's toolbox talk coming Wednesday",
     "birthdays": "BIRTHDAYS",
     "birthdaysEmpty": "No birthdays coming up.",

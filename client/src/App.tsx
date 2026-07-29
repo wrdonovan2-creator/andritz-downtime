@@ -19,6 +19,7 @@ import ByReason from "@/pages/by-reason";
 import Status from "@/pages/status";
 import Production from "@/pages/production";
 import Otd from "@/pages/otd";
+import Productivity from "@/pages/productivity";
 import Admin from "@/pages/admin";
 import Tv from "@/pages/tv";
 import Safety from "@/pages/safety";
@@ -59,6 +60,7 @@ function AppRouter() {
       <Route path="/status"><Protected><Status /></Protected></Route>
       <Route path="/production"><Protected><Production /></Protected></Route>
       <Route path="/otd"><Protected><Otd /></Protected></Route>
+      <Route path="/productivity"><Protected><Productivity /></Protected></Route>
       <Route path="/admin"><Protected><AdminGate /></Protected></Route>
       <Route component={NotFound} />
     </Switch>
