@@ -25,6 +25,8 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 // api/_src/index.ts
 var import_express = __toESM(require("express"));
 var import_express_session = __toESM(require("express-session"));
+var import_connect_pg_simple = __toESM(require("connect-pg-simple"));
+var import_pg = __toESM(require("pg"));
 
 // server/routes.ts
 var import_bcryptjs2 = __toESM(require("bcryptjs"), 1);
@@ -1605,8 +1607,19 @@ async function registerRoutes(httpServer, app2) {
 // api/_src/index.ts
 var app = (0, import_express.default)();
 app.use(import_express.default.json({ limit: "5mb" }));
+var PgStore = (0, import_connect_pg_simple.default)(import_express_session.default);
+var sessionPool = new import_pg.default.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 1
+  // serverless: one connection per instance is plenty
+});
 app.use(
   (0, import_express_session.default)({
+    store: new PgStore({
+      pool: sessionPool,
+      tableName: "user_sessions",
+      createTableIfMissing: true
+    }),
     name: "sid",
     secret: process.env.SESSION_SECRET || "dev-secret",
     resave: false,

@@ -16,12 +16,30 @@
 //   uses (`{ on: () => {} }`).
 import express, { type Express } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import pg from "pg";
 import { registerRoutes } from "../../server/routes";
 
 const app = express();
 app.use(express.json({ limit: "5mb" }));
+
+// Session store: Postgres via connect-pg-simple, backed by the same Neon
+// database used for app data. Previously this was the default in-memory
+// MemoryStore, which lost sessions across Vercel serverless cold starts and
+// caused intermittent 401s on any mutation (edit delay, save toolbox, etc.).
+const PgStore = connectPgSimple(session);
+const sessionPool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 1, // serverless: one connection per instance is plenty
+});
+
 app.use(
   session({
+    store: new PgStore({
+      pool: sessionPool,
+      tableName: "user_sessions",
+      createTableIfMissing: true,
+    }),
     name: "sid",
     secret: process.env.SESSION_SECRET || "dev-secret",
     resave: false,

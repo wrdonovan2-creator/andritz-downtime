@@ -288,8 +288,9 @@ function LogDialog({ open, onClose, assets, reasons, employees, editDelay }: {
         toast({ description: t("toast.delayLogged") });
         onClose();
       }
-    } catch {
-      toast({ variant: "destructive", description: t("toast.error") });
+    } catch (e: any) {
+      const msg = typeof e?.message === "string" ? e.message : "";
+      toast({ variant: "destructive", description: msg || t("toast.error") });
     } finally {
       setBusy(false);
     }
