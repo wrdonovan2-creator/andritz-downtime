@@ -60,8 +60,8 @@ const NAV = [
   { href: "/reason", key: "reason", icon: PieChart },
   { href: "/status", key: "status", icon: SignalHigh },
   { href: "/production", key: "production", icon: Package },
-  { href: "/otd", key: "otd", icon: BarChart3 },
   { href: "/productivity", key: "productivity", icon: Gauge },
+  { href: "/otd", key: "otd", icon: BarChart3 },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
