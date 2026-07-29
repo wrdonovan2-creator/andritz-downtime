@@ -1590,12 +1590,12 @@ async function registerRoutes(httpServer, app2) {
     res.json(updated);
   });
   app2.get("/api/toolbox", async (_req, res) => res.json(await storage.getToolboxTalk() || null));
-  app2.put("/api/toolbox", requireRole(MANAGERS), memoryUpload.single("image"), async (req, res) => {
+  app2.put("/api/toolbox", requireRole(MANAGERS), async (req, res) => {
     const patch = { updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-    if (req.body.title !== void 0) patch.title = String(req.body.title);
-    if (req.body.presenter !== void 0) patch.presenter = String(req.body.presenter);
-    if (req.body.notes !== void 0) patch.notes = String(req.body.notes);
-    if (req.body.weekOf !== void 0) patch.weekOf = String(req.body.weekOf);
+    if (req.body?.title !== void 0) patch.title = String(req.body.title);
+    if (req.body?.presenter !== void 0) patch.presenter = String(req.body.presenter);
+    if (req.body?.notes !== void 0) patch.notes = String(req.body.notes);
+    if (req.body?.weekOf !== void 0) patch.weekOf = String(req.body.weekOf);
     const tb = await storage.updateToolboxTalk(patch);
     res.json(tb);
   });

@@ -790,13 +790,21 @@ function ToolboxSection() {
   async function save() {
     setBusy(true);
     try {
-      const fd = new FormData();
-      fd.append("title", title.trim());
-      fd.append("presenter", presenter.trim());
-      fd.append("notes", notes.trim());
-      fd.append("weekOf", weekOf || mondayOfThisWeek());
-      if (image) fd.append("image", image);
-      const res = await fetch(`${assetUrl("/api/toolbox")}`, { method: "PUT", body: fd });
+      // JSON body — Vercel's serverless runtime pre-parses the request body,
+      // which broke the previous multipart/form-data + multer setup (every
+      // field arrived empty). Image uploads are disabled in this deployment
+      // regardless (no persistent filesystem on Vercel).
+      const payload = {
+        title: title.trim(),
+        presenter: presenter.trim(),
+        notes: notes.trim(),
+        weekOf: weekOf || mondayOfThisWeek(),
+      };
+      const res = await fetch(`${assetUrl("/api/toolbox")}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       if (!res.ok) throw new Error(String(res.status));
       queryClient.invalidateQueries({ queryKey: ["/api/toolbox"] });
       setImage(null);

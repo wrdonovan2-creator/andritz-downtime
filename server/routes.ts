@@ -878,14 +878,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ---- TOOLBOX TALK ----
   app.get("/api/toolbox", async (_req, res) => res.json((await storage.getToolboxTalk()) || null));
   // NOTE: image upload disabled (no persistent filesystem on Vercel) — see TODO at top of file.
-  app.put("/api/toolbox", requireRole(MANAGERS), memoryUpload.single("image"), async (req, res) => {
+  // NOTE: JSON body only. Multer/multipart was removed because Vercel's
+  // serverless runtime pre-parses the request body, which stripped every
+  // field before multer could see it. Image uploads are disabled in this
+  // deployment regardless (no persistent filesystem).
+  app.put("/api/toolbox", requireRole(MANAGERS), async (req, res) => {
     const patch: any = { updatedAt: new Date().toISOString() };
-    if (req.body.title !== undefined) patch.title = String(req.body.title);
-    if (req.body.presenter !== undefined) patch.presenter = String(req.body.presenter);
-    if (req.body.notes !== undefined) patch.notes = String(req.body.notes);
-    if (req.body.weekOf !== undefined) patch.weekOf = String(req.body.weekOf);
-    // Image uploads disabled in this deployment — see TODO above. Existing
-    // imagePath (if any) is left untouched.
+    if (req.body?.title !== undefined) patch.title = String(req.body.title);
+    if (req.body?.presenter !== undefined) patch.presenter = String(req.body.presenter);
+    if (req.body?.notes !== undefined) patch.notes = String(req.body.notes);
+    if (req.body?.weekOf !== undefined) patch.weekOf = String(req.body.weekOf);
     const tb = await storage.updateToolboxTalk(patch);
     res.json(tb);
   });
