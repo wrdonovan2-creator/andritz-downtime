@@ -15,7 +15,7 @@ import { useAuth, isPlantManager } from "@/lib/auth";
 import { useLang } from "@/lib/lang";
 import { apiUpload, assetUrl } from "@/lib/api";
 import { fmtMoney } from "@/i18n";
-import { DollarSign, Tag, Users, KeyRound, FileSpreadsheet, Plus, Trash2, Zap, CalendarClock, CalendarOff, Percent, ShieldAlert, Cake, ClipboardList } from "lucide-react";
+import { DollarSign, Tag, Users, KeyRound, FileSpreadsheet, Plus, Trash2, Zap, CalendarClock, CalendarOff, Percent, ShieldAlert, Cake, ClipboardList, Pencil } from "lucide-react";
 
 const STRAIGHT_CC = "CV492310";
 const ROTARY_CC = "CV492320";
@@ -58,7 +58,7 @@ export default function Admin() {
         <ScheduleSection plant={plant} />
         <DlhSection plant={plant} />
         <HolidaysSection />
-        <RatesSection plant={plant} />
+        <AssetsSection plant={plant} />
         <ReasonsSection />
         <EmployeesSection />
         {plant ? <PasswordsSection /> : (
@@ -69,33 +69,88 @@ export default function Admin() {
   );
 }
 
-function RatesSection({ plant }: { plant: boolean }) {
+function AssetsSection({ plant }: { plant: boolean }) {
   const { t } = useTranslation();
   const { lang } = useLang();
   const { toast } = useToast();
   const { data: assets, isLoading } = useAssets();
-  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const [editing, setEditing] = useState<number | null>(null);
+  const [draft, setDraft] = useState<any>({});
 
-  async function saveRate(id: number, value: string) {
-    await apiRequest("PATCH", `/api/assets/${id}`, { ratePerHour: Number(value) });
+  // Add-asset form
+  const [showAdd, setShowAdd] = useState(false);
+  const [newAsset, setNewAsset] = useState({ code: "", name: "", ratePerHour: "", costCenter: "", activityType: "" });
+
+  function startEdit(a: any) {
+    setEditing(a.id);
+    setDraft({ code: a.code, name: a.name, ratePerHour: String(a.ratePerHour ?? ""), costCenter: a.costCenter || "", activityType: a.activityType || "" });
+  }
+  function cancelEdit() {
+    setEditing(null);
+    setDraft({});
+  }
+  async function saveEdit(id: number) {
+    try {
+      await apiRequest("PATCH", `/api/assets/${id}`, {
+        code: draft.code,
+        name: draft.name,
+        ratePerHour: Number(draft.ratePerHour || 0),
+        costCenter: draft.costCenter,
+        activityType: draft.activityType,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rollups/dashboard", new Date().getFullYear()] });
+      cancelEdit();
+      toast({ description: t("admin.assetSaved") || "Asset saved" });
+    } catch (e: any) {
+      toast({ variant: "destructive", description: e?.message || "Save failed" });
+    }
+  }
+  async function toggleActive(a: any) {
+    await apiRequest("PATCH", `/api/assets/${a.id}`, { active: a.active ? false : true });
     queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/rollups/dashboard", new Date().getFullYear()] });
-    toast({ description: t("toast.rateUpdated") });
+  }
+  async function del(a: any) {
+    if (!confirm(`Delete asset "${a.name}"? This cannot be undone.`)) return;
+    try {
+      await apiRequest("DELETE", `/api/assets/${a.id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+      toast({ description: `Deleted ${a.name}` });
+    } catch (e: any) {
+      toast({ variant: "destructive", description: e?.message || "Delete failed" });
+    }
   }
   async function preset(costCenter: string, rate: number) {
     const res = await apiRequest("POST", "/api/assets/preset", { costCenter, ratePerHour: rate });
     const data = await res.json();
     queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
     queryClient.invalidateQueries({ queryKey: ["/api/rollups/dashboard", new Date().getFullYear()] });
-    setDrafts({});
     toast({ description: t("toast.presetApplied", { count: data.updated }) });
+  }
+  async function addAsset() {
+    if (!newAsset.code.trim() || !newAsset.name.trim()) return;
+    try {
+      await apiRequest("POST", "/api/assets", {
+        code: newAsset.code.trim(),
+        name: newAsset.name.trim(),
+        ratePerHour: Number(newAsset.ratePerHour || 0),
+        costCenter: newAsset.costCenter.trim(),
+        activityType: newAsset.activityType.trim(),
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/assets"] });
+      setNewAsset({ code: "", name: "", ratePerHour: "", costCenter: "", activityType: "" });
+      setShowAdd(false);
+      toast({ description: t("admin.assetAdded") || "Asset added" });
+    } catch (e: any) {
+      toast({ variant: "destructive", description: e?.message || "Add failed" });
+    }
   }
 
   return (
     <Section
       icon={DollarSign}
-      title={t("admin.rates")}
-      hint={t("admin.ratesHint")}
+      title={t("admin.assetsTitle") || "Assets & Rates"}
+      hint={t("admin.assetsHint") || "Edit machines and their rates. Add or remove equipment."}
       locked={!plant ? t("admin.noPermissionRates") : undefined}
     >
       {plant && (
@@ -113,31 +168,66 @@ function RatesSection({ plant }: { plant: boolean }) {
       {isLoading ? <Skeleton className="h-64 w-full" /> : (
         <div className="space-y-2">
           {(assets ?? []).map((a) => (
-            <div key={a.id} className="flex items-center gap-3" data-testid={`rate-row-${a.id}`}>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{a.name}</div>
-                <div className="text-xs text-muted-foreground">{a.costCenter} · {a.activityType}</div>
-              </div>
-              {plant ? (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-muted-foreground">$</span>
-                  <Input
-                    type="number" step="0.01"
-                    defaultValue={a.ratePerHour}
-                    onChange={(e) => setDrafts((d) => ({ ...d, [a.id]: e.target.value }))}
-                    className="h-9 w-24 text-right tabular-nums"
-                    data-testid={`input-rate-${a.id}`}
-                  />
-                  <Button size="sm" variant="outline" disabled={drafts[a.id] === undefined}
-                    onClick={() => saveRate(a.id, drafts[a.id])} data-testid={`button-save-rate-${a.id}`}>
-                    {t("buttons.save")}
-                  </Button>
+            <div key={a.id} className={`rounded-md p-2 ${a.active ? "bg-secondary/40" : "bg-secondary/20 opacity-60"}`} data-testid={`asset-row-${a.id}`}>
+              {editing === a.id ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1"><Label className="text-xs">Code</Label><Input value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} className="h-9" data-testid={`input-asset-code-${a.id}`} /></div>
+                    <div className="space-y-1"><Label className="text-xs">Rate/hr</Label><Input type="number" step="0.01" value={draft.ratePerHour} onChange={(e) => setDraft({ ...draft, ratePerHour: e.target.value })} className="h-9 tabular-nums" data-testid={`input-asset-rate-${a.id}`} /></div>
+                  </div>
+                  <div className="space-y-1"><Label className="text-xs">Name</Label><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className="h-9" data-testid={`input-asset-name-${a.id}`} /></div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1"><Label className="text-xs">Cost Center</Label><Input value={draft.costCenter} onChange={(e) => setDraft({ ...draft, costCenter: e.target.value })} className="h-9" data-testid={`input-asset-cc-${a.id}`} /></div>
+                    <div className="space-y-1"><Label className="text-xs">Activity Type</Label><Input value={draft.activityType} onChange={(e) => setDraft({ ...draft, activityType: e.target.value })} className="h-9" data-testid={`input-asset-act-${a.id}`} /></div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={cancelEdit} data-testid={`button-cancel-asset-${a.id}`}>{t("buttons.cancel") || "Cancel"}</Button>
+                    <Button size="sm" onClick={() => saveEdit(a.id)} data-testid={`button-save-asset-${a.id}`}>{t("buttons.save") || "Save"}</Button>
+                  </div>
                 </div>
               ) : (
-                <div className="text-sm font-semibold tabular-nums">{fmtMoney(a.ratePerHour, lang)}</div>
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium">{a.name}</span>
+                      {!a.active && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">Inactive</span>}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{a.code} · {a.costCenter} · {a.activityType} · <span className="tabular-nums">{fmtMoney(a.ratePerHour, lang)}/hr</span></div>
+                  </div>
+                  {plant && (
+                    <div className="flex items-center gap-1">
+                      <Switch checked={!!a.active} onCheckedChange={() => toggleActive(a)} data-testid={`switch-asset-${a.id}`} />
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => startEdit(a)} data-testid={`button-edit-asset-${a.id}`}><Pencil className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => del(a)} data-testid={`button-delete-asset-${a.id}`}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           ))}
+        </div>
+      )}
+      {plant && (
+        <div className="mt-4 border-t border-border pt-4">
+          {!showAdd ? (
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowAdd(true)} data-testid="button-add-asset"><Plus className="h-4 w-4" /> {t("admin.addAsset") || "Add asset"}</Button>
+          ) : (
+            <div className="space-y-2 rounded-md border border-dashed border-border p-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1"><Label className="text-xs">Code *</Label><Input value={newAsset.code} onChange={(e) => setNewAsset({ ...newAsset, code: e.target.value })} className="h-9" data-testid="input-new-asset-code" placeholder="2665" /></div>
+                <div className="space-y-1"><Label className="text-xs">Rate/hr</Label><Input type="number" step="0.01" value={newAsset.ratePerHour} onChange={(e) => setNewAsset({ ...newAsset, ratePerHour: e.target.value })} className="h-9" data-testid="input-new-asset-rate" placeholder="150.62" /></div>
+              </div>
+              <div className="space-y-1"><Label className="text-xs">Name *</Label><Input value={newAsset.name} onChange={(e) => setNewAsset({ ...newAsset, name: e.target.value })} className="h-9" data-testid="input-new-asset-name" placeholder="2665 Straight | Flatbed" /></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1"><Label className="text-xs">Cost Center</Label><Input value={newAsset.costCenter} onChange={(e) => setNewAsset({ ...newAsset, costCenter: e.target.value })} className="h-9" data-testid="input-new-asset-cc" placeholder="CV492310" /></div>
+                <div className="space-y-1"><Label className="text-xs">Activity Type</Label><Input value={newAsset.activityType} onChange={(e) => setNewAsset({ ...newAsset, activityType: e.target.value })} className="h-9" data-testid="input-new-asset-act" placeholder="6034" /></div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="outline" onClick={() => { setShowAdd(false); setNewAsset({ code: "", name: "", ratePerHour: "", costCenter: "", activityType: "" }); }} data-testid="button-cancel-new-asset">{t("buttons.cancel") || "Cancel"}</Button>
+                <Button size="sm" onClick={addAsset} disabled={!newAsset.code.trim() || !newAsset.name.trim()} data-testid="button-confirm-add-asset">{t("admin.addAsset") || "Add asset"}</Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Section>
@@ -153,6 +243,8 @@ function ReasonsSection() {
   const { data: reasons, isLoading } = useReasons();
   const [en, setEn] = useState("");
   const [es, setEs] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<{ en: string; es: string }>({ en: "", es: "" });
 
   async function add() {
     if (!es.trim()) return;
@@ -162,9 +254,24 @@ function ReasonsSection() {
     toast({ description: t("toast.reasonAdded") });
   }
   async function del(id: number) {
-    await apiRequest("DELETE", `/api/reasons/${id}`);
-    queryClient.invalidateQueries({ queryKey: ["/api/reasons"] });
-    toast({ description: t("toast.reasonDeleted") });
+    try {
+      await apiRequest("DELETE", `/api/reasons/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/reasons"] });
+      toast({ description: t("toast.reasonDeleted") });
+    } catch (e: any) {
+      toast({ variant: "destructive", description: e?.message || "Delete failed" });
+    }
+  }
+  function startRename(r: any) { setEditingId(r.id); setEditDraft({ en: r.labelEn || "", es: r.labelEs || "" }); }
+  function cancelRename() { setEditingId(null); setEditDraft({ en: "", es: "" }); }
+  async function saveRename(id: number) {
+    try {
+      await apiRequest("PATCH", `/api/reasons/${id}`, { labelEn: editDraft.en, labelEs: editDraft.es });
+      queryClient.invalidateQueries({ queryKey: ["/api/reasons"] });
+      cancelRename();
+    } catch (e: any) {
+      toast({ variant: "destructive", description: e?.message || "Save failed" });
+    }
   }
 
   return (
@@ -172,15 +279,31 @@ function ReasonsSection() {
       {isLoading ? <Skeleton className="h-40 w-full" /> : (
         <div className="space-y-1.5">
           {(reasons ?? []).map((r) => (
-            <div key={r.id} className="flex items-center justify-between rounded-md bg-secondary/40 px-3 py-2" data-testid={`reason-item-${r.id}`}>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-medium">{lang === "es" ? r.labelEs : r.labelEn}</div>
-                <div className="truncate text-xs text-muted-foreground">{lang === "es" ? r.labelEn : r.labelEs}</div>
-              </div>
-              {canEdit && (
-                <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-destructive" onClick={() => del(r.id)} data-testid={`button-delete-reason-${r.id}`}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+            <div key={r.id} className="rounded-md bg-secondary/40 px-3 py-2" data-testid={`reason-item-${r.id}`}>
+              {editingId === r.id ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1"><Label className="text-xs">{t("admin.newReasonEs")}</Label><Input value={editDraft.es} onChange={(e) => setEditDraft({ ...editDraft, es: e.target.value })} className="h-9" data-testid={`input-reason-es-${r.id}`} /></div>
+                    <div className="space-y-1"><Label className="text-xs">{t("admin.newReasonEn")}</Label><Input value={editDraft.en} onChange={(e) => setEditDraft({ ...editDraft, en: e.target.value })} className="h-9" data-testid={`input-reason-en-${r.id}`} /></div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={cancelRename}>{t("buttons.cancel") || "Cancel"}</Button>
+                    <Button size="sm" onClick={() => saveRename(r.id)} data-testid={`button-save-reason-${r.id}`}>{t("buttons.save") || "Save"}</Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{lang === "es" ? r.labelEs : r.labelEn}</div>
+                    <div className="truncate text-xs text-muted-foreground">{lang === "es" ? r.labelEn : r.labelEs}</div>
+                  </div>
+                  {canEdit && (
+                    <div className="flex items-center gap-1">
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => startRename(r)} data-testid={`button-edit-reason-${r.id}`}><Pencil className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => del(r.id)} data-testid={`button-delete-reason-${r.id}`}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           ))}
@@ -218,6 +341,9 @@ function EmployeesSection() {
   const { data: assignments } = useAssignments();
   const [name, setName] = useState("");
 
+  const [editEmpId, setEditEmpId] = useState<number | null>(null);
+  const [editEmpName, setEditEmpName] = useState("");
+
   async function addEmp() {
     if (!name.trim()) return;
     await apiRequest("POST", "/api/employees", { name });
@@ -228,6 +354,23 @@ function EmployeesSection() {
   async function toggleActive(id: number, active: boolean) {
     await apiRequest("PATCH", `/api/employees/${id}`, { active });
     queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+  }
+  function startEditEmp(e: any) { setEditEmpId(e.id); setEditEmpName(e.name); }
+  function cancelEditEmp() { setEditEmpId(null); setEditEmpName(""); }
+  async function saveEditEmp(id: number) {
+    try {
+      await apiRequest("PATCH", `/api/employees/${id}`, { name: editEmpName });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      cancelEditEmp();
+    } catch (e: any) { toast({ variant: "destructive", description: e?.message || "Save failed" }); }
+  }
+  async function delEmp(e: any) {
+    if (!confirm(`Delete employee "${e.name}"? If they have downtime history, set them Inactive instead.`)) return;
+    try {
+      await apiRequest("DELETE", `/api/employees/${e.id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/employees"] });
+      toast({ description: `Deleted ${e.name}` });
+    } catch (err: any) { toast({ variant: "destructive", description: err?.message || "Delete failed" }); }
   }
   async function setAssignment(assetId: number, shift: number, employeeId: string) {
     await apiRequest("POST", "/api/assignments", { assetId, shift, employeeId: employeeId === "none" ? null : Number(employeeId) });
@@ -244,12 +387,24 @@ function EmployeesSection() {
           {/* roster */}
           <div className="space-y-1.5">
             {(employees ?? []).map((e) => (
-              <div key={e.id} className="flex items-center justify-between rounded-md bg-secondary/40 px-3 py-2" data-testid={`employee-item-${e.id}`}>
-                <span className="text-sm font-medium">{e.name}</span>
-                {canEdit && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {t("admin.active")}
-                    <Switch checked={!!e.active} onCheckedChange={(v) => toggleActive(e.id, v)} data-testid={`switch-employee-${e.id}`} />
+              <div key={e.id} className="rounded-md bg-secondary/40 px-3 py-2" data-testid={`employee-item-${e.id}`}>
+                {editEmpId === e.id ? (
+                  <div className="flex items-center gap-2">
+                    <Input value={editEmpName} onChange={(ev) => setEditEmpName(ev.target.value)} className="h-9" data-testid={`input-employee-name-${e.id}`} />
+                    <Button size="sm" variant="outline" onClick={cancelEditEmp}>{t("buttons.cancel") || "Cancel"}</Button>
+                    <Button size="sm" onClick={() => saveEditEmp(e.id)} data-testid={`button-save-employee-${e.id}`}>{t("buttons.save") || "Save"}</Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{e.name}</span>
+                    {canEdit && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {t("admin.active")}
+                        <Switch checked={!!e.active} onCheckedChange={(v) => toggleActive(e.id, v)} data-testid={`switch-employee-${e.id}`} />
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => startEditEmp(e)} data-testid={`button-edit-employee-${e.id}`}><Pencil className="h-4 w-4" /></Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => delEmp(e)} data-testid={`button-delete-employee-${e.id}`}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

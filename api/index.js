@@ -486,6 +486,10 @@ var DatabaseStorage = class {
     const rows = await db.select().from(assets).where((0, import_drizzle_orm.eq)(assets.code, code));
     return rows[0];
   }
+  async createAsset(a) {
+    const rows = await db.insert(assets).values(a).returning();
+    return rows[0];
+  }
   async updateAsset(id, patch) {
     await db.update(assets).set(patch).where((0, import_drizzle_orm.eq)(assets.id, id));
     return this.getAsset(id);
@@ -504,6 +508,10 @@ var DatabaseStorage = class {
   async getReason(id) {
     const rows = await db.select().from(reasons).where((0, import_drizzle_orm.eq)(reasons.id, id));
     return rows[0];
+  }
+  async updateReason(id, patch) {
+    await db.update(reasons).set(patch).where((0, import_drizzle_orm.eq)(reasons.id, id));
+    return this.getReason(id);
   }
   async deleteReason(id) {
     await db.delete(reasons).where((0, import_drizzle_orm.eq)(reasons.id, id));
@@ -903,9 +911,32 @@ async function registerRoutes(httpServer, app2) {
     res.json({ lang });
   });
   app2.get("/api/assets", async (_req, res) => res.json(await storage.listAssets()));
+  app2.post("/api/assets", requireRole("plant_manager"), async (req, res) => {
+    const code = String(req.body?.code || "").trim();
+    const name = String(req.body?.name || "").trim();
+    if (!code || !name) return res.status(400).json({ message: "Code and name required." });
+    const existing = await storage.getAssetByCode(code);
+    if (existing) return res.status(409).json({ message: `Asset code ${code} already exists.` });
+    const created = await storage.createAsset({
+      code,
+      name,
+      ratePerHour: req.body?.ratePerHour != null ? Number(req.body.ratePerHour) : 0,
+      costCenter: String(req.body?.costCenter || ""),
+      activityType: String(req.body?.activityType || ""),
+      active: req.body?.active === false || req.body?.active === 0 ? 0 : 1
+    });
+    res.status(201).json(created);
+  });
   app2.patch("/api/assets/:id", requireRole("plant_manager"), async (req, res) => {
     const id = parseInt(req.params.id, 10);
     const patch = {};
+    if (req.body.code !== void 0) {
+      const newCode = String(req.body.code).trim();
+      if (!newCode) return res.status(400).json({ message: "Code cannot be empty." });
+      const clash = await storage.getAssetByCode(newCode);
+      if (clash && clash.id !== id) return res.status(409).json({ message: `Asset code ${newCode} already exists.` });
+      patch.code = newCode;
+    }
     if (req.body.ratePerHour !== void 0) patch.ratePerHour = Number(req.body.ratePerHour);
     if (req.body.costCenter !== void 0) patch.costCenter = String(req.body.costCenter);
     if (req.body.activityType !== void 0) patch.activityType = String(req.body.activityType);
@@ -945,8 +976,22 @@ async function registerRoutes(httpServer, app2) {
     if (!labelEn) labelEn = labelEs;
     res.status(201).json(await storage.createReason({ labelEn, labelEs }));
   });
+  app2.patch("/api/reasons/:id", requireRole(MANAGERS), async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const patch = {};
+    if (req.body?.labelEn !== void 0) patch.labelEn = String(req.body.labelEn).trim();
+    if (req.body?.labelEs !== void 0) patch.labelEs = String(req.body.labelEs).trim();
+    const updated = await storage.updateReason(id, patch);
+    if (!updated) return res.status(404).json({ message: "Reason not found." });
+    res.json(updated);
+  });
   app2.delete("/api/reasons/:id", requireRole(MANAGERS), async (req, res) => {
-    await storage.deleteReason(parseInt(req.params.id, 10));
+    const id = parseInt(req.params.id, 10);
+    const delayList = await storage.listDelays();
+    if (delayList.some((d) => d.reasonId === id)) {
+      return res.status(409).json({ message: "Cannot delete: reason has delay history." });
+    }
+    await storage.deleteReason(id);
     res.json({ ok: true });
   });
   app2.get("/api/employees", async (_req, res) => res.json(await storage.listEmployees()));
@@ -965,7 +1010,12 @@ async function registerRoutes(httpServer, app2) {
     res.json(e);
   });
   app2.delete("/api/employees/:id", requireRole(MANAGERS), async (req, res) => {
-    await storage.deleteEmployee(parseInt(req.params.id, 10));
+    const id = parseInt(req.params.id, 10);
+    const delayList = await storage.listDelays();
+    if (delayList.some((d) => d.employeeId === id)) {
+      return res.status(409).json({ message: "Cannot delete: employee has delay history. Set inactive instead." });
+    }
+    await storage.deleteEmployee(id);
     res.json({ ok: true });
   });
   app2.get("/api/assignments", async (_req, res) => res.json(await storage.listAssignments()));

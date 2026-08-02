@@ -12,6 +12,10 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { RequestHelpButton } from "@/components/request-help-button";
 
+// Plant identifier — change this one line to fork the app for another plant.
+// V403 = South Holland | V402 = Rockville
+export const PLANT_TAG = "V403 · South Holland";
+
 export function Logo({ className }: { className?: string }) {
   return (
     <svg
@@ -90,11 +94,16 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background text-foreground">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar md:flex">
-        <div className="flex items-center gap-3 border-b border-sidebar-border px-5 py-5">
-          <span className="text-primary"><Logo className="h-8 w-8" /></span>
-          <div className="leading-tight">
-            <div className="text-base font-bold">{t("app.subtitle")}</div>
-            <div className="text-xs text-muted-foreground">{t("app.company")}</div>
+        <div className="border-b border-sidebar-border px-5 py-5">
+          <div className="flex items-center gap-3">
+            <span className="text-primary"><Logo className="h-8 w-8" /></span>
+            <div className="leading-tight">
+              <div className="text-base font-bold">{t("app.subtitle")}</div>
+              <div className="text-xs text-muted-foreground">{t("app.company")}</div>
+            </div>
+          </div>
+          <div className="mt-3 inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary ring-1 ring-primary/30" data-testid="text-plant-tag">
+            {PLANT_TAG}
           </div>
         </div>
         <nav className="flex-1 space-y-1 p-3">
@@ -149,9 +158,12 @@ export function Shell({ children }: { children: ReactNode }) {
 
       {/* Mobile top bar */}
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-sidebar px-4 py-3 md:hidden">
-        <div className="flex items-center gap-2">
-          <span className="text-primary"><Logo className="h-7 w-7" /></span>
-          <span className="text-base font-bold">{t("app.subtitle")}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-primary shrink-0"><Logo className="h-7 w-7" /></span>
+          <div className="leading-tight min-w-0">
+            <div className="text-base font-bold truncate">{t("app.subtitle")}</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-primary truncate" data-testid="text-plant-tag-mobile">{PLANT_TAG}</div>
+          </div>
         </div>
         <div className="flex items-center gap-1">
           <LangToggle />

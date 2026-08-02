@@ -146,9 +146,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // ---- ASSETS ----
   app.get("/api/assets", async (_req, res) => res.json(await storage.listAssets()));
+  app.post("/api/assets", requireRole("plant_manager"), async (req, res) => {
+    const code = String(req.body?.code || "").trim();
+    const name = String(req.body?.name || "").trim();
+    if (!code || !name) return res.status(400).json({ message: "Code and name required." });
+    const existing = await storage.getAssetByCode(code);
+    if (existing) return res.status(409).json({ message: `Asset code ${code} already exists.` });
+    const created = await storage.createAsset({
+      code,
+      name,
+      ratePerHour: req.body?.ratePerHour != null ? Number(req.body.ratePerHour) : 0,
+      costCenter: String(req.body?.costCenter || ""),
+      activityType: String(req.body?.activityType || ""),
+      active: req.body?.active === false || req.body?.active === 0 ? 0 : 1,
+    });
+    res.status(201).json(created);
+  });
   app.patch("/api/assets/:id", requireRole("plant_manager"), async (req, res) => {
     const id = parseInt(req.params.id, 10);
     const patch: any = {};
+    if (req.body.code !== undefined) {
+      const newCode = String(req.body.code).trim();
+      if (!newCode) return res.status(400).json({ message: "Code cannot be empty." });
+      const clash = await storage.getAssetByCode(newCode);
+      if (clash && clash.id !== id) return res.status(409).json({ message: `Asset code ${newCode} already exists.` });
+      patch.code = newCode;
+    }
     if (req.body.ratePerHour !== undefined) patch.ratePerHour = Number(req.body.ratePerHour);
     if (req.body.costCenter !== undefined) patch.costCenter = String(req.body.costCenter);
     if (req.body.activityType !== undefined) patch.activityType = String(req.body.activityType);
@@ -188,8 +211,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!labelEn) labelEn = labelEs;
     res.status(201).json(await storage.createReason({ labelEn, labelEs }));
   });
+  app.patch("/api/reasons/:id", requireRole(MANAGERS), async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const patch: any = {};
+    if (req.body?.labelEn !== undefined) patch.labelEn = String(req.body.labelEn).trim();
+    if (req.body?.labelEs !== undefined) patch.labelEs = String(req.body.labelEs).trim();
+    const updated = await storage.updateReason(id, patch);
+    if (!updated) return res.status(404).json({ message: "Reason not found." });
+    res.json(updated);
+  });
   app.delete("/api/reasons/:id", requireRole(MANAGERS), async (req, res) => {
-    await storage.deleteReason(parseInt(req.params.id, 10));
+    const id = parseInt(req.params.id, 10);
+    const delayList = await storage.listDelays();
+    if (delayList.some((d) => d.reasonId === id)) {
+      return res.status(409).json({ message: "Cannot delete: reason has delay history." });
+    }
+    await storage.deleteReason(id);
     res.json({ ok: true });
   });
 
@@ -210,7 +247,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(e);
   });
   app.delete("/api/employees/:id", requireRole(MANAGERS), async (req, res) => {
-    await storage.deleteEmployee(parseInt(req.params.id, 10));
+    const id = parseInt(req.params.id, 10);
+    const delayList = await storage.listDelays();
+    if (delayList.some((d) => d.employeeId === id)) {
+      return res.status(409).json({ message: "Cannot delete: employee has delay history. Set inactive instead." });
+    }
+    await storage.deleteEmployee(id);
     res.json({ ok: true });
   });
 

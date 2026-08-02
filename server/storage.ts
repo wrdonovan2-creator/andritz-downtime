@@ -264,11 +264,13 @@ export interface IStorage {
   listAssets(): Promise<Asset[]>;
   getAsset(id: number): Promise<Asset | undefined>;
   getAssetByCode(code: string): Promise<Asset | undefined>;
+  createAsset(a: InsertAsset): Promise<Asset>;
   updateAsset(id: number, patch: Partial<InsertAsset>): Promise<Asset | undefined>;
   deleteAsset(id: number): Promise<void>;
   listReasons(): Promise<Reason[]>;
   createReason(r: InsertReason): Promise<Reason>;
   getReason(id: number): Promise<Reason | undefined>;
+  updateReason(id: number, patch: Partial<InsertReason>): Promise<Reason | undefined>;
   deleteReason(id: number): Promise<void>;
   listDelays(): Promise<Delay[]>;
   getDelay(id: number): Promise<Delay | undefined>;
@@ -338,6 +340,10 @@ export class DatabaseStorage implements IStorage {
     const rows = await db.select().from(assets).where(eq(assets.code, code));
     return rows[0];
   }
+  async createAsset(a: InsertAsset) {
+    const rows = await db.insert(assets).values(a).returning();
+    return rows[0];
+  }
   async updateAsset(id: number, patch: Partial<InsertAsset>) {
     await db.update(assets).set(patch).where(eq(assets.id, id));
     return this.getAsset(id);
@@ -355,6 +361,10 @@ export class DatabaseStorage implements IStorage {
   async getReason(id: number) {
     const rows = await db.select().from(reasons).where(eq(reasons.id, id));
     return rows[0];
+  }
+  async updateReason(id: number, patch: Partial<InsertReason>) {
+    await db.update(reasons).set(patch).where(eq(reasons.id, id));
+    return this.getReason(id);
   }
   async deleteReason(id: number) { await db.delete(reasons).where(eq(reasons.id, id)); }
   async listDelays() { return db.select().from(delays).orderBy(delays.id); }
