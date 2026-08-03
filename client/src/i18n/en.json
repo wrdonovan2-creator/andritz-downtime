@@ -230,6 +230,8 @@
     "toolboxTitle": "Title",
     "toolboxTitlePlaceholder": "e.g., Auditor visit Wednesday 8/6",
     "toolboxPresenter": "Posted by",
+    "toolboxPresenterOther": "Other (type a name…)",
+    "toolboxPresenterPlaceholder": "Type a name",
     "toolboxNotes": "Details",
     "toolboxWeekOf": "Week of",
     "toolboxImage": "Image (optional)",

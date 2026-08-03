@@ -1014,7 +1014,36 @@ function ToolboxSection() {
           </div>
           <div className="space-y-1">
             <Label className="text-xs">{t("admin.toolboxPresenter")}</Label>
-            <Input value={presenter} onChange={(e) => setPresenter(e.target.value)} className="h-9" placeholder="Frank Eneman" data-testid="input-toolbox-presenter" />
+            {(() => {
+              const preset = presenter === "Frank Eneman" || presenter === "Bill Donovan" ? presenter : "__other__";
+              return (
+                <>
+                  <select
+                    value={preset}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "__other__") setPresenter("");
+                      else setPresenter(v);
+                    }}
+                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                    data-testid="select-toolbox-presenter"
+                  >
+                    <option value="Frank Eneman">Frank Eneman</option>
+                    <option value="Bill Donovan">Bill Donovan</option>
+                    <option value="__other__">{t("admin.toolboxPresenterOther")}</option>
+                  </select>
+                  {preset === "__other__" && (
+                    <Input
+                      value={presenter}
+                      onChange={(e) => setPresenter(e.target.value)}
+                      className="mt-2 h-9"
+                      placeholder={t("admin.toolboxPresenterPlaceholder")}
+                      data-testid="input-toolbox-presenter"
+                    />
+                  )}
+                </>
+              );
+            })()}
           </div>
           <div className="space-y-1">
             <Label className="text-xs">{t("admin.toolboxWeekOf")}</Label>

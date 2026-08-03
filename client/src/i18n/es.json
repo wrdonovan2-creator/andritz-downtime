@@ -230,6 +230,8 @@
     "toolboxTitle": "Título",
     "toolboxTitlePlaceholder": "ej., Visita del auditor miércoles 8/6",
     "toolboxPresenter": "Publicado por",
+    "toolboxPresenterOther": "Otro (escribir un nombre…)",
+    "toolboxPresenterPlaceholder": "Escriba un nombre",
     "toolboxNotes": "Detalles",
     "toolboxWeekOf": "Semana del",
     "toolboxImage": "Imagen (opcional)",
