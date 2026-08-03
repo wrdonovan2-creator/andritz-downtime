@@ -537,7 +537,10 @@ function ScheduleSection({ plant }: { plant: boolean }) {
               <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="py-2 pr-2 font-semibold">{t("misc.day")}</th>
                 <th className="py-2 px-2 text-right font-semibold">{t("admin.workingHours")}</th>
-                <th className="py-2 px-2 text-right font-semibold">{t("admin.startHour")}</th>
+                <th className="py-2 px-2 text-right font-semibold">
+                  <div>{t("admin.startHour")}</div>
+                  <div className="text-[10px] font-normal normal-case tracking-normal text-muted-foreground">{t("admin.startHourHint")}</div>
+                </th>
                 {plant && <th className="py-2 pl-2 text-right font-semibold" />}
               </tr>
             </thead>
@@ -745,6 +748,12 @@ function SafetySection({ plant }: { plant: boolean }) {
       : s === "reviewed" ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
       : "bg-destructive/15 text-destructive";
 
+  const typeBadgeCls = (typ: string) =>
+    typ === "safety" ? "bg-destructive/15 text-destructive"
+      : typ === "operations" ? "bg-blue-500/15 text-blue-600 dark:text-blue-400"
+      : typ === "quality" ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+      : "bg-muted text-muted-foreground";
+
   return (
     <Section icon={ShieldAlert} title={t("admin.safetyTab")} hint={t("admin.safetyHint")}>
       {isLoading ? <Skeleton className="h-40 w-full" /> : (
@@ -760,6 +769,11 @@ function SafetySection({ plant }: { plant: boolean }) {
                 <div key={c.id} className="rounded-lg border border-border bg-secondary/30 p-3" data-testid={`safety-item-${c.id}`}>
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <div className="min-w-0">
+                      <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${typeBadgeCls((c as any).concernType || "safety")}`} data-testid={`safety-type-${c.id}`}>
+                          {t(`safety.type${((c as any).concernType || "safety").charAt(0).toUpperCase() + ((c as any).concernType || "safety").slice(1)}`)}
+                        </span>
+                      </div>
                       <p className="text-sm font-medium leading-snug">{c.message}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {c.submitterName ? c.submitterName : t("admin.safetyAnonymous")}
@@ -925,6 +939,7 @@ function ToolboxSection() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { data: toolbox, isLoading } = useToolbox();
+  const [noteType, setNoteType] = useState<"safety" | "visitor" | "event" | "reminder" | "other">("safety");
   const [title, setTitle] = useState("");
   const [presenter, setPresenter] = useState("Frank Eneman");
   const [notes, setNotes] = useState("");
@@ -935,6 +950,7 @@ function ToolboxSection() {
 
   // Seed the form fields once from the server record.
   if (!initialized && toolbox !== undefined) {
+    setNoteType(((toolbox as any)?.noteType || "safety") as any);
     setTitle(toolbox?.title ?? "");
     setPresenter(toolbox?.presenter || "Frank Eneman");
     setNotes(toolbox?.notes ?? "");
@@ -950,6 +966,7 @@ function ToolboxSection() {
       // field arrived empty). Image uploads are disabled in this deployment
       // regardless (no persistent filesystem on Vercel).
       const payload = {
+        noteType,
         title: title.trim(),
         presenter: presenter.trim(),
         notes: notes.trim(),
@@ -976,8 +993,24 @@ function ToolboxSection() {
       {isLoading ? <Skeleton className="h-40 w-full" /> : (
         <div className="space-y-3">
           <div className="space-y-1">
+            <Label className="text-xs">{t("admin.toolboxType")}</Label>
+            <select
+              value={noteType}
+              onChange={(e) => setNoteType(e.target.value as any)}
+              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+              data-testid="select-toolbox-type"
+            >
+              <option value="safety">{t("admin.toolboxTypeSafety")}</option>
+              <option value="visitor">{t("admin.toolboxTypeVisitor")}</option>
+              <option value="event">{t("admin.toolboxTypeEvent")}</option>
+              <option value="reminder">{t("admin.toolboxTypeReminder")}</option>
+              <option value="other">{t("admin.toolboxTypeOther")}</option>
+            </select>
+            <p className="text-[11px] text-muted-foreground">{t("admin.toolboxTypeHint")}</p>
+          </div>
+          <div className="space-y-1">
             <Label className="text-xs">{t("admin.toolboxTitle")}</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} className="h-9" data-testid="input-toolbox-title" />
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} className="h-9" placeholder={t("admin.toolboxTitlePlaceholder")} data-testid="input-toolbox-title" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">{t("admin.toolboxPresenter")}</Label>

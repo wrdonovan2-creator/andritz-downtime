@@ -720,7 +720,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const message = (req.body?.message || "").toString().trim();
     if (message.length < 10) return res.status(400).json({ message: "Message must be at least 10 characters." });
     if (message.length > 1000) return res.status(400).json({ message: "Message must be 1000 characters or fewer." });
+    const rawType = (req.body?.concernType || "safety").toString().toLowerCase();
+    const concernType = ["safety", "operations", "quality", "other"].includes(rawType) ? rawType : "safety";
     const created = await storage.createSafetyConcern({
+      concernType,
       message,
       submitterName: (req.body?.submitterName || "").toString().trim().slice(0, 120),
       submitterContact: (req.body?.submitterContact || "").toString().trim().slice(0, 200),
@@ -959,6 +962,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // deployment regardless (no persistent filesystem).
   app.put("/api/toolbox", requireRole(MANAGERS), async (req, res) => {
     const patch: any = { updatedAt: new Date().toISOString() };
+    if (req.body?.noteType !== undefined) {
+      const nt = String(req.body.noteType).toLowerCase();
+      patch.noteType = ["safety", "visitor", "event", "reminder", "other"].includes(nt) ? nt : "safety";
+    }
     if (req.body?.title !== undefined) patch.title = String(req.body.title);
     if (req.body?.presenter !== undefined) patch.presenter = String(req.body.presenter);
     if (req.body?.notes !== undefined) patch.notes = String(req.body.notes);

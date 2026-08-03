@@ -84,9 +84,12 @@ export const holidays = pgTable("holidays", {
   labelEs: text("label_es").notNull(),
 });
 
-// SAFETY CONCERNS — anonymous or attributed submissions from the team.
+// CONCERNS — anonymous or attributed submissions from the team.
+// Formerly "safety concerns" but now covers Safety, Operations, Quality, Other.
+// Table name kept as safety_concerns for backwards-compatibility with existing data.
 export const safetyConcerns = pgTable("safety_concerns", {
   id: serial("id").primaryKey(),
+  concernType: text("concern_type").notNull().default("safety"), // 'safety' | 'operations' | 'quality' | 'other'
   message: text("message").notNull(),
   submitterName: text("submitter_name").notNull().default(""), // optional; "" = anonymous
   submitterContact: text("submitter_contact").notNull().default(""), // optional phone/email
@@ -106,10 +109,12 @@ export const birthdays = pgTable("birthdays", {
   photoPath: text("photo_path").notNull().default(""), // optional /uploads/birthdays/xxx.jpg
 });
 
-// TOOLBOX TALK — the current week's safety topic (photo uploaded weekly).
-// Single-row table by convention (id=1).
+// NOTE OF THE WEEK — formerly "Toolbox Talk."
+// The current week's shop-floor note: safety topic, visitor notice, event, or reminder.
+// Single-row table by convention (id=1). Table name kept as toolbox_talk for backwards compatibility.
 export const toolboxTalk = pgTable("toolbox_talk", {
   id: serial("id").primaryKey(),
+  noteType: text("note_type").notNull().default("safety"), // 'safety' | 'visitor' | 'event' | 'reminder' | 'other'
   weekOf: text("week_of").notNull().default(""), // YYYY-MM-DD (Monday of the week)
   title: text("title").notNull().default(""),
   presenter: text("presenter").notNull().default("Frank Eneman"),

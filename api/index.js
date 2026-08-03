@@ -113,6 +113,8 @@ var holidays = (0, import_pg_core.pgTable)("holidays", {
 });
 var safetyConcerns = (0, import_pg_core.pgTable)("safety_concerns", {
   id: (0, import_pg_core.serial)("id").primaryKey(),
+  concernType: (0, import_pg_core.text)("concern_type").notNull().default("safety"),
+  // 'safety' | 'operations' | 'quality' | 'other'
   message: (0, import_pg_core.text)("message").notNull(),
   submitterName: (0, import_pg_core.text)("submitter_name").notNull().default(""),
   // optional; "" = anonymous
@@ -139,6 +141,8 @@ var birthdays = (0, import_pg_core.pgTable)("birthdays", {
 });
 var toolboxTalk = (0, import_pg_core.pgTable)("toolbox_talk", {
   id: (0, import_pg_core.serial)("id").primaryKey(),
+  noteType: (0, import_pg_core.text)("note_type").notNull().default("safety"),
+  // 'safety' | 'visitor' | 'event' | 'reminder' | 'other'
   weekOf: (0, import_pg_core.text)("week_of").notNull().default(""),
   // YYYY-MM-DD (Monday of the week)
   title: (0, import_pg_core.text)("title").notNull().default(""),
@@ -316,6 +320,7 @@ async function ensureTables() {
   await sql`
     CREATE TABLE IF NOT EXISTS safety_concerns (
       id SERIAL PRIMARY KEY,
+      concern_type TEXT NOT NULL DEFAULT 'safety',
       message TEXT NOT NULL,
       submitter_name TEXT NOT NULL DEFAULT '',
       submitter_contact TEXT NOT NULL DEFAULT '',
@@ -326,6 +331,7 @@ async function ensureTables() {
       responded_at TEXT NOT NULL DEFAULT ''
     )
   `;
+  await sql`ALTER TABLE safety_concerns ADD COLUMN IF NOT EXISTS concern_type TEXT NOT NULL DEFAULT 'safety'`;
   await sql`
     CREATE TABLE IF NOT EXISTS birthdays (
       id SERIAL PRIMARY KEY,
@@ -338,6 +344,7 @@ async function ensureTables() {
   await sql`
     CREATE TABLE IF NOT EXISTS toolbox_talk (
       id SERIAL PRIMARY KEY,
+      note_type TEXT NOT NULL DEFAULT 'safety',
       week_of TEXT NOT NULL DEFAULT '',
       title TEXT NOT NULL DEFAULT '',
       presenter TEXT NOT NULL DEFAULT 'Frank Eneman',
@@ -364,6 +371,11 @@ async function ensureTables() {
     await sql`ALTER TABLE toolbox_talk ADD COLUMN IF NOT EXISTS presenter TEXT NOT NULL DEFAULT 'Frank Eneman'`;
   } catch (e) {
     console.warn("toolbox_talk presenter migration:", e);
+  }
+  try {
+    await sql`ALTER TABLE toolbox_talk ADD COLUMN IF NOT EXISTS note_type TEXT NOT NULL DEFAULT 'safety'`;
+  } catch (e) {
+    console.warn("toolbox_talk note_type migration:", e);
   }
 }
 var STRAIGHT_RATE = 150.62;
@@ -1471,7 +1483,10 @@ async function registerRoutes(httpServer, app2) {
     const message = (req.body?.message || "").toString().trim();
     if (message.length < 10) return res.status(400).json({ message: "Message must be at least 10 characters." });
     if (message.length > 1e3) return res.status(400).json({ message: "Message must be 1000 characters or fewer." });
+    const rawType = (req.body?.concernType || "safety").toString().toLowerCase();
+    const concernType = ["safety", "operations", "quality", "other"].includes(rawType) ? rawType : "safety";
     const created = await storage.createSafetyConcern({
+      concernType,
       message,
       submitterName: (req.body?.submitterName || "").toString().trim().slice(0, 120),
       submitterContact: (req.body?.submitterContact || "").toString().trim().slice(0, 200),
@@ -1672,6 +1687,10 @@ async function registerRoutes(httpServer, app2) {
   app2.get("/api/toolbox", async (_req, res) => res.json(await storage.getToolboxTalk() || null));
   app2.put("/api/toolbox", requireRole(MANAGERS), async (req, res) => {
     const patch = { updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
+    if (req.body?.noteType !== void 0) {
+      const nt = String(req.body.noteType).toLowerCase();
+      patch.noteType = ["safety", "visitor", "event", "reminder", "other"].includes(nt) ? nt : "safety";
+    }
     if (req.body?.title !== void 0) patch.title = String(req.body.title);
     if (req.body?.presenter !== void 0) patch.presenter = String(req.body.presenter);
     if (req.body?.notes !== void 0) patch.notes = String(req.body.notes);

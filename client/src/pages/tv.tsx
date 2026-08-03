@@ -589,45 +589,62 @@ export default function Tv() {
           </Slide>
         )}
 
-        {slide === "toolbox" && (
+        {slide === "toolbox" && (() => {
+          const tb: any = toolbox as any;
+          const noteType = (tb?.noteType || "safety") as "safety" | "visitor" | "event" | "reminder" | "other";
+          const badgeCls: Record<string, string> = {
+            safety: "bg-red-500/20 text-red-200 border-red-500/40",
+            visitor: "bg-blue-500/20 text-blue-200 border-blue-500/40",
+            event: "bg-amber-500/20 text-amber-200 border-amber-500/40",
+            reminder: "bg-emerald-500/20 text-emerald-200 border-emerald-500/40",
+            other: "bg-white/10 text-white/80 border-white/20",
+          };
+          const badgeLabel = t(`admin.toolboxType${noteType.charAt(0).toUpperCase() + noteType.slice(1)}`);
+          return (
           <Slide title={t("tv.toolbox")}>
-            {toolbox && (toolbox.imagePath || toolbox.title || toolbox.notes) ? (
-              <div className={toolbox.imagePath ? "grid grid-cols-2 items-center gap-8" : "mx-auto max-w-4xl"}>
-                {toolbox.imagePath && (
+            {tb && (tb.imagePath || tb.title || tb.notes) ? (
+              <div className={tb.imagePath ? "grid grid-cols-2 items-center gap-8" : "mx-auto max-w-4xl"}>
+                {tb.imagePath && (
                   <div className="flex items-center justify-center">
                     <img
-                      src={assetUrl(toolbox.imagePath)}
-                      alt={toolbox.title || "Toolbox talk"}
+                      src={assetUrl(tb.imagePath)}
+                      alt={tb.title || "Note of the week"}
                       className="max-h-[70vh] w-full rounded-2xl border border-white/10 object-contain"
                       data-testid="img-toolbox"
                     />
                   </div>
                 )}
                 <div>
-                  {toolbox.presenter && (
-                    <div className="mb-2 text-lg font-semibold uppercase tracking-widest text-primary" data-testid="text-toolbox-presenter">
-                      {lang === "es" ? "Presentado por" : "Presented by"} {toolbox.presenter}
-                    </div>
-                  )}
-                  {toolbox.weekOf && (
-                    <div className="mb-3 text-sm font-semibold uppercase tracking-widest text-primary">
-                      {t("admin.toolboxWeekOf")} {toolbox.weekOf}
-                    </div>
-                  )}
-                  {toolbox.title && <h2 className="text-5xl font-black leading-tight">{toolbox.title}</h2>}
-                  {toolbox.notes && <p className="mt-6 whitespace-pre-wrap text-2xl leading-relaxed text-white/75">{toolbox.notes}</p>}
-                  <div className="mt-8 rounded-lg border-l-4 border-primary bg-primary/10 px-5 py-3 text-lg font-semibold text-white/90" data-testid="text-toolbox-contact">
-                    {lang === "es"
-                      ? "¿Preguntas? Contacte a Frank Eneman."
-                      : "Questions? Contact Frank Eneman."}
+                  <div className={`mb-3 inline-flex items-center rounded-full border px-4 py-1 text-sm font-bold uppercase tracking-widest ${badgeCls[noteType]}`} data-testid="badge-toolbox-type">
+                    {badgeLabel}
                   </div>
+                  {tb.presenter && (
+                    <div className="mb-2 text-lg font-semibold uppercase tracking-widest text-primary" data-testid="text-toolbox-presenter">
+                      {lang === "es" ? "Publicado por" : "Posted by"} {tb.presenter}
+                    </div>
+                  )}
+                  {tb.weekOf && (
+                    <div className="mb-3 text-sm font-semibold uppercase tracking-widest text-primary">
+                      {t("admin.toolboxWeekOf")} {tb.weekOf}
+                    </div>
+                  )}
+                  {tb.title && <h2 className="text-5xl font-black leading-tight">{tb.title}</h2>}
+                  {tb.notes && <p className="mt-6 whitespace-pre-wrap text-2xl leading-relaxed text-white/75">{tb.notes}</p>}
+                  {noteType === "safety" && (
+                    <div className="mt-8 rounded-lg border-l-4 border-primary bg-primary/10 px-5 py-3 text-lg font-semibold text-white/90" data-testid="text-toolbox-contact">
+                      {lang === "es"
+                        ? "¿Preguntas? Contacte a Frank Eneman."
+                        : "Questions? Contact Frank Eneman."}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
               <Empty text={t("tv.toolboxEmpty")} />
             )}
           </Slide>
-        )}
+          );
+        })()}
 
         {/* SLIDE 7 — BIRTHDAYS (today only; slide is skipped from rotation when empty) */}
         {slide === "birthday" && bdayToday.length > 0 && (

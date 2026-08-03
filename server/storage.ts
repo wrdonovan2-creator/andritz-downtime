@@ -110,6 +110,7 @@ async function ensureTables() {
   await sql`
     CREATE TABLE IF NOT EXISTS safety_concerns (
       id SERIAL PRIMARY KEY,
+      concern_type TEXT NOT NULL DEFAULT 'safety',
       message TEXT NOT NULL,
       submitter_name TEXT NOT NULL DEFAULT '',
       submitter_contact TEXT NOT NULL DEFAULT '',
@@ -120,6 +121,8 @@ async function ensureTables() {
       responded_at TEXT NOT NULL DEFAULT ''
     )
   `;
+  // Migration: add concern_type to legacy databases that predate the rename.
+  await sql`ALTER TABLE safety_concerns ADD COLUMN IF NOT EXISTS concern_type TEXT NOT NULL DEFAULT 'safety'`;
   await sql`
     CREATE TABLE IF NOT EXISTS birthdays (
       id SERIAL PRIMARY KEY,
@@ -132,6 +135,7 @@ async function ensureTables() {
   await sql`
     CREATE TABLE IF NOT EXISTS toolbox_talk (
       id SERIAL PRIMARY KEY,
+      note_type TEXT NOT NULL DEFAULT 'safety',
       week_of TEXT NOT NULL DEFAULT '',
       title TEXT NOT NULL DEFAULT '',
       presenter TEXT NOT NULL DEFAULT 'Frank Eneman',
@@ -159,6 +163,12 @@ async function ensureTables() {
     await sql`ALTER TABLE toolbox_talk ADD COLUMN IF NOT EXISTS presenter TEXT NOT NULL DEFAULT 'Frank Eneman'`;
   } catch (e) {
     console.warn("toolbox_talk presenter migration:", e);
+  }
+  // Migration: add note_type column for the "Note of the Week" rename.
+  try {
+    await sql`ALTER TABLE toolbox_talk ADD COLUMN IF NOT EXISTS note_type TEXT NOT NULL DEFAULT 'safety'`;
+  } catch (e) {
+    console.warn("toolbox_talk note_type migration:", e);
   }
 }
 

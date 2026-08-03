@@ -22,6 +22,7 @@ export default function Safety() {
   const { lang } = useLang();
   const { theme, toggle } = useTheme();
 
+  const [concernType, setConcernType] = useState<"safety" | "operations" | "quality" | "other">("safety");
   const [message, setMessage] = useState("");
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
@@ -44,6 +45,7 @@ export default function Safety() {
     setBusy(true);
     try {
       await apiRequest("POST", "/api/safety/concerns", {
+        concernType,
         message: msg,
         submitterName: name.trim(),
         submitterContact: contact.trim(),
@@ -57,6 +59,7 @@ export default function Safety() {
   }
 
   function reset() {
+    setConcernType("safety");
     setMessage("");
     setName("");
     setContact("");
@@ -117,6 +120,25 @@ export default function Safety() {
               {t("safety.description")}
             </p>
             <form onSubmit={submit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="concernType" className="font-semibold">
+                  {t("safety.typeLabel")}
+                  <span className="ml-1 text-destructive">*</span>
+                </Label>
+                <select
+                  id="concernType"
+                  data-testid="select-concern-type"
+                  value={concernType}
+                  onChange={(e) => setConcernType(e.target.value as any)}
+                  className="h-11 w-full rounded-md border border-input bg-background px-3 text-base font-medium"
+                >
+                  <option value="safety">{t("safety.typeSafety")}</option>
+                  <option value="operations">{t("safety.typeOperations")}</option>
+                  <option value="quality">{t("safety.typeQuality")}</option>
+                  <option value="other">{t("safety.typeOther")}</option>
+                </select>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="msg" className="font-semibold">
                   {t("safety.message", { lng: lang })}
