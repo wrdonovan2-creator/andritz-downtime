@@ -680,12 +680,14 @@ export default function Tv() {
             <div className="grid grid-cols-2 gap-10">
               {/* Top-left: QR */}
               <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
-                <h2 className="text-3xl font-black tracking-tight">{t("tv.safetyTitle")}</h2>
-                <p className="mt-2 text-lg text-white/50">{t("tv.safetyScan")}</p>
+                <h2 className="text-4xl font-black tracking-tight">{t("tv.safetyTitle")}</h2>
+                <p className="mt-3 max-w-md text-lg font-semibold text-white/70">{t("tv.safetySubtitle")}</p>
                 <div className="mt-6 rounded-2xl bg-white p-5">
                   <QRCodeSVG value={SAFETY_URL} size={320} level="M" data-testid="qr-safety" />
                 </div>
-                <div className="mt-5 text-2xl font-bold tabular-nums text-primary">shd.pplx.app/#/safety</div>
+                <p className="mt-4 text-sm uppercase tracking-widest text-white/45">{t("tv.safetyScan")}</p>
+                <div className="mt-4 text-xl font-bold tabular-nums text-primary">shd.pplx.app/#/safety</div>
+                <p className="mt-5 max-w-md text-sm italic text-white/50">{t("tv.safetyReviewedLine")}</p>
               </div>
               {/* Right: recent responses */}
               <div className="flex flex-col">
