@@ -49,6 +49,44 @@ export default function Tv() {
   const [, setTick] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Auto-reload when a new version is deployed.
+  // Every 5 min we fetch index.html and compare the JS bundle hash embedded in
+  // its <script src="..."> tag. If it changed, the site was redeployed — reload
+  // so the shop TV always shows the latest version without anyone touching it.
+  useEffect(() => {
+    let currentHash: string | null = null;
+
+    const extractHash = (html: string): string | null => {
+      // matches: /assets/index-<hash>.js  (Vite output pattern)
+      const m = html.match(/assets\/index-[A-Za-z0-9_-]+\.js/);
+      return m ? m[0] : null;
+    };
+
+    const checkVersion = async () => {
+      try {
+        const res = await fetch(`/index.html?_=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const html = await res.text();
+        const hash = extractHash(html);
+        if (!hash) return;
+        if (currentHash === null) {
+          currentHash = hash;
+          return;
+        }
+        if (hash !== currentHash) {
+          // New deploy detected — hard-reload to pick up new bundle.
+          window.location.reload();
+        }
+      } catch {
+        // Network hiccup — ignore, we'll try again next tick.
+      }
+    };
+
+    checkVersion(); // establish baseline immediately
+    const id = setInterval(checkVersion, 5 * 60 * 1000); // every 5 minutes
+    return () => clearInterval(id);
+  }, []);
+
   const { data: dash } = useDashboard(30000);
   const { data: delays } = useDelays(30000);
   const { data: reasons } = useByReason(30000);
