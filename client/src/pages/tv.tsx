@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { QRCodeSVG } from "qrcode.react";
 import { useDashboard, useDelays, useByReason, useToolbox, useUpcomingBirthdays, useRecentResponses, useOpenConcerns, useHolidays, useProductionOrders, useOtd, useProductivity } from "@/lib/hooks";
 import { useLang } from "@/lib/lang";
@@ -722,6 +723,34 @@ function CurrentStateColumn({ lang, delays, extra }: { lang: "en" | "es"; delays
   const labels = lang === "es"
     ? { header: "ESTADO ACTUAL", downFor: "PARADO POR", operator: "Operador", noComment: "Sin comentarios", more: "más" }
     : { header: "CURRENT STATE", downFor: "DOWN FOR", operator: "Operator", noComment: "No comment", more: "more" };
+  // Lazy-translate: when this Spanish panel sees a delay whose English comment
+  // has no cached translation, ask the backend to translate + cache it once.
+  // Tracks in-flight ids so we don't hammer the endpoint on every re-render.
+  const requestedRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    if (lang !== "es") return;
+    const toFetch = delays.filter((d) => {
+      if (requestedRef.current.has(d.id)) return false;
+      const needsDesc = d.description && !d.descriptionEs;
+      const needsCA = d.correctiveActions && !d.correctiveActionsEs;
+      return needsDesc || needsCA;
+    });
+    if (toFetch.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (const d of toFetch) {
+        if (cancelled) break;
+        requestedRef.current.add(d.id);
+        try {
+          await apiRequest("POST", `/api/delays/${d.id}/translate`);
+        } catch { /* leave requestedRef marked to avoid retry storms */ }
+      }
+      if (!cancelled) {
+        queryClient.invalidateQueries({ queryKey: ["/api/delays"] });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [lang, delays]);
   return (
     <div>
       <div className="mb-4 text-sm font-bold uppercase tracking-widest text-white/40">{labels.header}</div>
@@ -742,7 +771,9 @@ function CurrentStateColumn({ lang, delays, extra }: { lang: "en" | "es"; delays
               <div className="mt-2 text-2xl font-black leading-tight">{d.assetName}</div>
               {d.employeeName && <div className="mt-0.5 text-sm text-white/60">{labels.operator}: {d.employeeName}</div>}
               {d.description ? (
-                <p className="mt-2 whitespace-pre-wrap break-words text-base leading-relaxed text-white/70">{d.description}</p>
+                <p className="mt-2 whitespace-pre-wrap break-words text-base leading-relaxed text-white/70">
+                  {lang === "es" ? (d.descriptionEs || d.description) : d.description}
+                </p>
               ) : (
                 <p className="mt-2 text-base italic text-white/35">{labels.noComment}</p>
               )}

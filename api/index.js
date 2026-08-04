@@ -80,6 +80,10 @@ var delays = (0, import_pg_core.pgTable)("delays", {
   assetId: (0, import_pg_core.integer)("asset_id").notNull(),
   reasonId: (0, import_pg_core.integer)("reason_id"),
   description: (0, import_pg_core.text)("description").notNull().default(""),
+  descriptionEs: (0, import_pg_core.text)("description_es").notNull().default(""),
+  // auto-translated cache of description for the Spanish TV panel
+  correctiveActionsEs: (0, import_pg_core.text)("corrective_actions_es").notNull().default(""),
+  // auto-translated cache of corrective_actions
   dateDown: (0, import_pg_core.text)("date_down").notNull(),
   // YYYY-MM-DD
   timeDown: (0, import_pg_core.text)("time_down").notNull(),
@@ -290,6 +294,8 @@ async function ensureTables() {
       asset_id INTEGER NOT NULL,
       reason_id INTEGER,
       description TEXT NOT NULL DEFAULT '',
+      description_es TEXT NOT NULL DEFAULT '',
+      corrective_actions_es TEXT NOT NULL DEFAULT '',
       date_down TEXT NOT NULL,
       time_down TEXT NOT NULL,
       date_up TEXT,
@@ -376,6 +382,12 @@ async function ensureTables() {
     await sql`ALTER TABLE toolbox_talk ADD COLUMN IF NOT EXISTS note_type TEXT NOT NULL DEFAULT 'safety'`;
   } catch (e) {
     console.warn("toolbox_talk note_type migration:", e);
+  }
+  try {
+    await sql`ALTER TABLE delays ADD COLUMN IF NOT EXISTS description_es TEXT NOT NULL DEFAULT ''`;
+    await sql`ALTER TABLE delays ADD COLUMN IF NOT EXISTS corrective_actions_es TEXT NOT NULL DEFAULT ''`;
+  } catch (e) {
+    console.warn("delays translation cache migration:", e);
   }
 }
 var STRAIGHT_RATE = 150.62;
@@ -859,6 +871,38 @@ function weekStart(year, week) {
 function fmtDate(d) {
   return d.toISOString().slice(0, 10);
 }
+async function translateToSpanish(text2) {
+  const trimmed = (text2 || "").trim();
+  if (!trimmed) return "";
+  const chunks = [];
+  let buf = "";
+  for (const part of trimmed.split(/(?<=[.!?。])\s+/)) {
+    if ((buf + " " + part).length > 450) {
+      if (buf) chunks.push(buf);
+      buf = part;
+    } else {
+      buf = buf ? buf + " " + part : part;
+    }
+  }
+  if (buf) chunks.push(buf);
+  const results = [];
+  for (const chunk of chunks) {
+    try {
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunk)}&langpair=en|es`;
+      const r = await fetch(url, { headers: { "User-Agent": "andritz-downtime/1.0" } });
+      if (!r.ok) {
+        results.push(chunk);
+        continue;
+      }
+      const j = await r.json();
+      const out = j?.responseData?.translatedText || chunk;
+      results.push(String(out));
+    } catch {
+      results.push(chunk);
+    }
+  }
+  return results.join(" ");
+}
 function requireAuth(req, res, next) {
   if (!req.session?.role) return res.status(401).json({ message: "Please sign in." });
   next();
@@ -1147,6 +1191,12 @@ async function registerRoutes(httpServer, app2) {
     if (patch.reasonId !== void 0) patch.reasonId = patch.reasonId ? Number(patch.reasonId) : null;
     if (patch.shift !== void 0) patch.shift = patch.shift ? Number(patch.shift) : null;
     if (patch.employeeId !== void 0) patch.employeeId = patch.employeeId ? Number(patch.employeeId) : null;
+    if (patch.description !== void 0 && patch.description !== existing.description) {
+      patch.descriptionEs = "";
+    }
+    if (patch.correctiveActions !== void 0 && patch.correctiveActions !== existing.correctiveActions) {
+      patch.correctiveActionsEs = "";
+    }
     const d = await storage.updateDelay(id, patch);
     if (!d) return res.status(404).json({ message: "Delay not found." });
     res.json(await enrichDelay(d));
@@ -1154,6 +1204,24 @@ async function registerRoutes(httpServer, app2) {
   app2.delete("/api/delays/:id", requireRole(MANAGERS), async (req, res) => {
     await storage.deleteDelay(parseInt(req.params.id, 10));
     res.json({ ok: true });
+  });
+  app2.post("/api/delays/:id/translate", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const existing = await storage.getDelay(id);
+    if (!existing) return res.status(404).json({ message: "Delay not found." });
+    const patch = {};
+    if (existing.description && !existing.descriptionEs) {
+      patch.descriptionEs = await translateToSpanish(existing.description);
+    }
+    if (existing.correctiveActions && !existing.correctiveActionsEs) {
+      patch.correctiveActionsEs = await translateToSpanish(existing.correctiveActions);
+    }
+    if (Object.keys(patch).length === 0) {
+      return res.json(await enrichDelay(existing));
+    }
+    const d = await storage.updateDelay(id, patch);
+    if (!d) return res.status(404).json({ message: "Delay not found." });
+    res.json(await enrichDelay(d));
   });
   async function allEnriched(year) {
     const raw = await storage.listDelays();

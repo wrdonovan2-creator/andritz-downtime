@@ -40,6 +40,40 @@ function weekStart(year: number, week: number): Date {
 }
 function fmtDate(d: Date): string { return d.toISOString().slice(0, 10); }
 
+// ---- MyMemory free translation (no API key). 5000 chars/day per IP.
+// Used to auto-translate shop-floor comments to Spanish for the TV kiosk.
+// Result is cached on the row so we only translate each unique comment once.
+async function translateToSpanish(text: string): Promise<string> {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return "";
+  // MyMemory has a 500-char limit per request. Chunk on sentence boundaries.
+  const chunks: string[] = [];
+  let buf = "";
+  for (const part of trimmed.split(/(?<=[.!?。])\s+/)) {
+    if ((buf + " " + part).length > 450) {
+      if (buf) chunks.push(buf);
+      buf = part;
+    } else {
+      buf = buf ? buf + " " + part : part;
+    }
+  }
+  if (buf) chunks.push(buf);
+  const results: string[] = [];
+  for (const chunk of chunks) {
+    try {
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunk)}&langpair=en|es`;
+      const r = await fetch(url, { headers: { "User-Agent": "andritz-downtime/1.0" } });
+      if (!r.ok) { results.push(chunk); continue; }
+      const j: any = await r.json();
+      const out = j?.responseData?.translatedText || chunk;
+      results.push(String(out));
+    } catch {
+      results.push(chunk);
+    }
+  }
+  return results.join(" ");
+}
+
 type Role = "operator" | "production_manager" | "plant_manager";
 
 declare module "express-session" {
@@ -383,6 +417,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (patch.reasonId !== undefined) patch.reasonId = patch.reasonId ? Number(patch.reasonId) : null;
     if (patch.shift !== undefined) patch.shift = patch.shift ? Number(patch.shift) : null;
     if (patch.employeeId !== undefined) patch.employeeId = patch.employeeId ? Number(patch.employeeId) : null;
+    // If the English comment or corrective actions changed, invalidate the
+    // Spanish translation cache so the TV re-translates on next view.
+    if (patch.description !== undefined && patch.description !== existing.description) {
+      patch.descriptionEs = "";
+    }
+    if (patch.correctiveActions !== undefined && patch.correctiveActions !== existing.correctiveActions) {
+      patch.correctiveActionsEs = "";
+    }
     const d = await storage.updateDelay(id, patch);
     if (!d) return res.status(404).json({ message: "Delay not found." });
     res.json(await enrichDelay(d));
@@ -391,6 +433,29 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.delete("/api/delays/:id", requireRole(MANAGERS), async (req, res) => {
     await storage.deleteDelay(parseInt(req.params.id, 10));
     res.json({ ok: true });
+  });
+
+  // Lazy translate: called by the Spanish TV panel when it sees a delay whose
+  // Spanish comment cache is empty. No auth required (public read like /api/delays).
+  // Populates description_es and corrective_actions_es on the row and returns the
+  // enriched delay so the TV can immediately show translated text.
+  app.post("/api/delays/:id/translate", async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const existing = await storage.getDelay(id);
+    if (!existing) return res.status(404).json({ message: "Delay not found." });
+    const patch: any = {};
+    if (existing.description && !(existing as any).descriptionEs) {
+      patch.descriptionEs = await translateToSpanish(existing.description);
+    }
+    if (existing.correctiveActions && !(existing as any).correctiveActionsEs) {
+      patch.correctiveActionsEs = await translateToSpanish(existing.correctiveActions);
+    }
+    if (Object.keys(patch).length === 0) {
+      return res.json(await enrichDelay(existing));
+    }
+    const d = await storage.updateDelay(id, patch);
+    if (!d) return res.status(404).json({ message: "Delay not found." });
+    res.json(await enrichDelay(d));
   });
 
   // ---- ROLLUPS ----

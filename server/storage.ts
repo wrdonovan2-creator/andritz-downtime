@@ -80,6 +80,8 @@ async function ensureTables() {
       asset_id INTEGER NOT NULL,
       reason_id INTEGER,
       description TEXT NOT NULL DEFAULT '',
+      description_es TEXT NOT NULL DEFAULT '',
+      corrective_actions_es TEXT NOT NULL DEFAULT '',
       date_down TEXT NOT NULL,
       time_down TEXT NOT NULL,
       date_up TEXT,
@@ -169,6 +171,13 @@ async function ensureTables() {
     await sql`ALTER TABLE toolbox_talk ADD COLUMN IF NOT EXISTS note_type TEXT NOT NULL DEFAULT 'safety'`;
   } catch (e) {
     console.warn("toolbox_talk note_type migration:", e);
+  }
+  // Migration: add Spanish translation cache columns on delays.
+  try {
+    await sql`ALTER TABLE delays ADD COLUMN IF NOT EXISTS description_es TEXT NOT NULL DEFAULT ''`;
+    await sql`ALTER TABLE delays ADD COLUMN IF NOT EXISTS corrective_actions_es TEXT NOT NULL DEFAULT ''`;
+  } catch (e) {
+    console.warn("delays translation cache migration:", e);
   }
 }
 

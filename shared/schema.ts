@@ -57,6 +57,8 @@ export const delays = pgTable("delays", {
   assetId: integer("asset_id").notNull(),
   reasonId: integer("reason_id"),
   description: text("description").notNull().default(""),
+  descriptionEs: text("description_es").notNull().default(""), // auto-translated cache of description for the Spanish TV panel
+  correctiveActionsEs: text("corrective_actions_es").notNull().default(""), // auto-translated cache of corrective_actions
   dateDown: text("date_down").notNull(), // YYYY-MM-DD
   timeDown: text("time_down").notNull(), // HH:MM
   dateUp: text("date_up"), // YYYY-MM-DD | null (open)
