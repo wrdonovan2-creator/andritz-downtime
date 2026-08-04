@@ -446,26 +446,27 @@ export default function Tv() {
                       tone={goal != null && ytd != null ? (ytd >= goal ? "green" : "danger") : undefined}
                     />
                   </div>
-                  {/* Chart: bars, gridlines and goal line all share the same 300px plot area */}
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                  {/* Chart: bars, gridlines and goal line all share the same plot area */}
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-8">
                     {(() => {
-                      const PLOT_PX = 300;    // 0-100% maps to 0-300px
-                      const X_LABEL_PX = 24;  // room below plot for Jan/Feb/... labels
+                      const PLOT_PX = 440;    // 0-100% maps to 0-440px — sized for TV kiosks
+                      const X_LABEL_PX = 36;  // room below plot for month labels
+                      const currentMonth = new Date().getMonth(); // 0-based
                       return (
                         <div className="relative" style={{ height: `${PLOT_PX + X_LABEL_PX}px` }}>
                           {/* Plot area (anchored to top of x-axis labels) */}
                           <div
-                            className="absolute left-8 right-2"
+                            className="absolute left-12 right-4"
                             style={{ bottom: `${X_LABEL_PX}px`, height: `${PLOT_PX}px` }}
                           >
                             {/* Y-axis gridlines */}
                             {[0, 20, 40, 60, 80, 100].map((y) => (
                               <div
                                 key={y}
-                                className="absolute left-0 right-0 border-t border-white/5"
+                                className="absolute left-0 right-0 border-t border-white/10"
                                 style={{ bottom: `${(y / 100) * PLOT_PX}px` }}
                               >
-                                <span className="absolute -left-8 -top-2.5 w-7 text-right text-xs text-white/40">
+                                <span className="absolute -left-12 -top-3 w-10 text-right text-base font-semibold text-white/50">
                                   {y}%
                                 </span>
                               </div>
@@ -476,7 +477,7 @@ export default function Tv() {
                                 className="absolute left-0 right-0 border-t-2 border-dashed border-yellow-400"
                                 style={{ bottom: `${(goal / 100) * PLOT_PX}px` }}
                               >
-                                <div className="absolute -top-3.5 right-0 rounded bg-yellow-400 px-2 py-0.5 text-xs font-black text-black">
+                                <div className="absolute -top-4 right-0 rounded bg-yellow-400 px-2.5 py-1 text-sm font-black text-black shadow-lg">
                                   Goal {Math.round(goal)}%
                                 </div>
                               </div>
@@ -487,32 +488,47 @@ export default function Tv() {
                                 const hasVal = v != null && v > 0;
                                 const barPx = hasVal ? (v / 100) * PLOT_PX : 0;
                                 const meetsGoal = goal != null && hasVal && v >= goal;
+                                const isFuture = i > currentMonth;
                                 return (
-                                  <div key={i} className="flex flex-1 flex-col items-center justify-end" style={{ height: `${PLOT_PX}px` }}>
+                                  <div key={i} className="flex flex-1 flex-col items-center justify-end px-1" style={{ height: `${PLOT_PX}px` }}>
                                     {hasVal && (
-                                      <div className="text-sm font-bold tabular-nums text-white" style={{ marginBottom: "2px" }}>
+                                      <div className="text-base font-black tabular-nums text-white drop-shadow" style={{ marginBottom: "4px" }}>
                                         {Math.round(v!)}%
                                       </div>
                                     )}
                                     <div
-                                      className={`w-3/5 rounded-t ${meetsGoal ? "bg-green-400" : hasVal ? "bg-sky-400" : "bg-white/10"}`}
-                                      style={{ height: `${Math.max(barPx, hasVal ? 4 : 2)}px` }}
+                                      className={`w-4/5 rounded-t transition-all ${
+                                        meetsGoal ? "bg-emerald-400 shadow-lg shadow-emerald-500/30"
+                                        : hasVal ? "bg-sky-400 shadow-lg shadow-sky-500/30"
+                                        : isFuture ? "bg-white/[0.06] border-t border-dashed border-white/20"
+                                        : "bg-red-400/40"
+                                      }`}
+                                      style={{ height: `${hasVal ? barPx : (isFuture ? 8 : 4)}px` }}
                                     />
                                   </div>
                                 );
                               })}
                             </div>
                           </div>
-                          {/* X-axis month labels, aligned to the same column layout */}
+                          {/* X-axis month labels, aligned to the same column layout. Current month highlighted. */}
                           <div
-                            className="absolute left-8 right-2 flex items-start justify-between"
+                            className="absolute left-12 right-4 flex items-start justify-between"
                             style={{ bottom: 0, height: `${X_LABEL_PX}px` }}
                           >
-                            {monthLabels.map((m, i) => (
-                              <div key={i} className="flex flex-1 justify-center text-sm font-semibold text-white/60">
-                                {m}
-                              </div>
-                            ))}
+                            {monthLabels.map((m, i) => {
+                              const isCurrent = i === currentMonth;
+                              const isFuture = i > currentMonth;
+                              return (
+                                <div
+                                  key={i}
+                                  className={`flex flex-1 justify-center text-base font-bold uppercase tracking-wider ${
+                                    isCurrent ? "text-yellow-300" : isFuture ? "text-white/25" : "text-white/70"
+                                  }`}
+                                >
+                                  {m}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );
