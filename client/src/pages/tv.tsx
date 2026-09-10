@@ -87,17 +87,17 @@ export default function Tv() {
     return () => clearInterval(id);
   }, []);
 
-  const { data: dash } = useDashboard(30000);
-  const { data: delays } = useDelays(30000);
-  const { data: reasons } = useByReason(30000);
-  const { data: toolbox } = useToolbox(60000);
-  const { data: birthdays } = useUpcomingBirthdays(60000);
-  const { data: responses } = useRecentResponses(60000);
-  const { data: openConcerns } = useOpenConcerns(30000);
+  const { data: dash } = useDashboard(120000);
+  const { data: delays } = useDelays(120000);
+  const { data: reasons } = useByReason(120000);
+  const { data: toolbox } = useToolbox(300000);
+  const { data: birthdays } = useUpcomingBirthdays(300000);
+  const { data: responses } = useRecentResponses(300000);
+  const { data: openConcerns } = useOpenConcerns(120000);
   const { data: allHolidays } = useHolidays();
-  const { data: prodOrders } = useProductionOrders(60000);
-  const { data: otd } = useOtd(new Date().getFullYear(), 60000);
-  const { data: productivity } = useProductivity(60000);
+  const { data: prodOrders } = useProductionOrders(300000);
+  const { data: otd } = useOtd(new Date().getFullYear(), 300000);
+  const { data: productivity } = useProductivity(300000);
 
   // Birthday slide only appears when someone has a birthday TODAY.
   const hasBirthdayToday = (birthdays ?? []).some((b) => b.isToday);
