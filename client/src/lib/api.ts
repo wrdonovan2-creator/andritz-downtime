@@ -12,9 +12,10 @@ export async function apiUpload(url: string, form: FormData): Promise<Response> 
   return res;
 }
 
-// Resolve a stored /uploads path to an absolute URL through the proxy.
+// Resolve a stored path or absolute Blob URL to a usable image src.
 export function assetUrl(p?: string | null): string | undefined {
   if (!p) return undefined;
+  if (p.startsWith("http://") || p.startsWith("https://")) return p;
   return `${API_BASE}${p}`;
 }
 
