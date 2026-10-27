@@ -6,9 +6,10 @@ serverless app backed by Postgres (Neon).
 
 ## File uploads via Vercel Blob
 
-- Delay photos and birthday photos are now stored in Vercel Blob (public URLs).
+- Delay photos and birthday photos are stored in Vercel Blob (public URLs).
 - Requires `BLOB_READ_WRITE_TOKEN` environment variable on the Vercel project.
-- `photoPath` fields store the full public Blob URL.
+- **If the token is missing**: uploads are skipped, a console warning is logged (`[blob] BLOB_READ_WRITE_TOKEN is missing — photo upload skipped ...`), and the delay/birthday is still saved with no photo. The app does not crash.
+- `photoPath` fields store the full public Blob URL when an upload succeeds.
 - Client `assetUrl()` helper detects absolute URLs and returns them as-is.
 - Old `/uploads/*` paths still return 410 (legacy).
 
@@ -18,6 +19,6 @@ serverless app backed by Postgres (Neon).
 |---|---|
 | `DATABASE_URL` | Postgres/Neon connection string. |
 | `SESSION_SECRET` | Session cookie secret. |
-| `BLOB_READ_WRITE_TOKEN` | Required for photo uploads. Create a Blob store in the Vercel dashboard and copy the token. |
+| `BLOB_READ_WRITE_TOKEN` | Required for photo uploads. Create a Blob store in the Vercel dashboard and copy the token. If absent, photos are silently skipped. |
 
 Toolbox talk image upload remains JSON-only for now and can be extended the same way.
