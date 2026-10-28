@@ -8,6 +8,7 @@ import { fmtMoney, fmtHours, fmtInt } from "@/i18n";
 import { assetUrl } from "@/lib/api";
 import { getGreeting, getGreetingOther } from "@/lib/greeting";
 import andritzLogo from "@assets/andritz-logo.png";
+import { useShopHours, isShopHours } from "@/lib/shop-hours";
 
 const SLIDE_MS = 15000;
 
@@ -87,17 +88,23 @@ export default function Tv() {
     return () => clearInterval(id);
   }, []);
 
-  const { data: dash } = useDashboard(120000);
-  const { data: delays } = useDelays(120000);
-  const { data: reasons } = useByReason(120000);
-  const { data: toolbox } = useToolbox(300000);
-  const { data: birthdays } = useUpcomingBirthdays(300000);
-  const { data: responses } = useRecentResponses(300000);
-  const { data: openConcerns } = useOpenConcerns(120000);
+  // Cost control: refresh data only during shop hours so the Neon database
+  // can suspend overnight and on Sundays. Off-hours the TV keeps showing the
+  // last loaded data.
+  const shopOpen = useShopHours();
+  const fast = shopOpen ? 120000 : false;
+  const slow = shopOpen ? 300000 : false;
+  const { data: dash } = useDashboard(fast as any);
+  const { data: delays } = useDelays(fast as any);
+  const { data: reasons } = useByReason(fast as any);
+  const { data: toolbox } = useToolbox(slow as any);
+  const { data: birthdays } = useUpcomingBirthdays(slow as any);
+  const { data: responses } = useRecentResponses(slow as any);
+  const { data: openConcerns } = useOpenConcerns(fast as any);
   const { data: allHolidays } = useHolidays();
-  const { data: prodOrders } = useProductionOrders(300000);
-  const { data: otd } = useOtd(new Date().getFullYear(), 300000);
-  const { data: productivity } = useProductivity(300000);
+  const { data: prodOrders } = useProductionOrders(slow as any);
+  const { data: otd } = useOtd(new Date().getFullYear(), slow as any);
+  const { data: productivity } = useProductivity(slow as any);
 
   // Birthday slide only appears when someone has a birthday TODAY.
   const hasBirthdayToday = (birthdays ?? []).some((b) => b.isToday);
@@ -188,14 +195,14 @@ export default function Tv() {
     return () => clearInterval(id);
   }, []);
 
-  // hourly full reload (kiosk resilience)
+  // hourly full reload (kiosk resilience) — shop hours only, because each
+  // reload re-fetches everything and would wake the database overnight.
   useEffect(() => {
-    const meta = document.createElement("meta");
-    meta.httpEquiv = "refresh";
-    meta.content = "3600";
-    document.head.appendChild(meta);
     document.documentElement.classList.add("dark");
-    return () => { meta.remove(); };
+    const id = setInterval(() => {
+      if (isShopHours()) window.location.reload();
+    }, 3600 * 1000);
+    return () => clearInterval(id);
   }, []);
 
   // hide cursor after 3s inactivity
