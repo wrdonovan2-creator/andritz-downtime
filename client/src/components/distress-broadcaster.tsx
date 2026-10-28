@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth, isManager } from "@/lib/auth";
+import { useShopHours, usePageVisible } from "@/lib/shop-hours";
 
 // The frontend and backend share the same origin under the reverse proxy in
 // prod. In dev, the Vite proxy handles /api. So we can always use relative URLs.
@@ -56,9 +57,19 @@ export function DistressBroadcaster() {
 
   // Poll for active distress alerts instead of holding a WebSocket/SSE
   // connection open (Vercel serverless functions can't hold long-lived
-  // connections). A 5s interval keeps the panic-button experience snappy
-  // without hammering the DB.
+  // connections).
+  //
+  // Cost control: every poll hits the API and the Neon database, and a 5s
+  // poll from an always-on TV kept the database awake 24/7. Now:
+  //   - 15s interval while polling
+  //   - paused while the tab is hidden
+  //   - unattended (signed-out) screens such as the break-room TV only poll
+  //     during shop hours; signed-in users keep polling at any hour.
+  const shopOpen = useShopHours();
+  const visible = usePageVisible();
+  const shouldPoll = visible && (shopOpen || !!role);
   useEffect(() => {
+    if (!shouldPoll) return;
     let cancelled = false;
     async function poll() {
       try {
@@ -71,12 +82,12 @@ export function DistressBroadcaster() {
       }
     }
     poll();
-    const id = setInterval(poll, 5000);
+    const id = setInterval(poll, 15000);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, []);
+  }, [shouldPoll]);
 
   const active = useMemo(() => alerts.filter((a) => a.status !== "resolved"), [alerts]);
   // Dismissal is anonymous-only — once signed in as a manager/production user we always show the overlay so they can respond.
