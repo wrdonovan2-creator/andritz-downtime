@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 // Shop hours for background polling, in plant local time (America/Chicago).
 // Outside this window, unattended screens (break-room TV, idle browsers) stop
 // calling the API so the Neon database can suspend and stop billing compute.
-// Mon–Sat 04:00–20:00 covers the Mon–Thu 10h / Fri 8h / Sat 4h schedule with
-// margin on both ends. Sunday is closed.
+// Mon–Sat 07:00–17:00 (set by Plant Manager 2026-10-28 to keep the tracker
+// within Neon free-plan compute limits). Sunday is closed.
 export const SHOP_TZ = "America/Chicago";
-export const SHOP_OPEN_HOUR = 4;
-export const SHOP_CLOSE_HOUR = 20;
+export const SHOP_OPEN_HOUR = 7;
+export const SHOP_CLOSE_HOUR = 17;
 
 export function isShopHours(d: Date = new Date()): boolean {
   const parts = new Intl.DateTimeFormat("en-US", {
