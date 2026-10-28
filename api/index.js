@@ -32,6 +32,7 @@ var import_pg = __toESM(require("pg"));
 var import_bcryptjs2 = __toESM(require("bcryptjs"), 1);
 var import_exceljs = __toESM(require("exceljs"), 1);
 var import_multer = __toESM(require("multer"), 1);
+var import_blob = require("@vercel/blob");
 
 // shared/schema.ts
 var import_pg_core = require("drizzle-orm/pg-core");
@@ -918,6 +919,25 @@ function requireRole(roles) {
 }
 var MANAGERS = ["production_manager", "plant_manager"];
 var memoryUpload = (0, import_multer.default)({ storage: import_multer.default.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+async function uploadToBlob(file, prefix) {
+  if (!file) return null;
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    console.warn(`[blob] BLOB_READ_WRITE_TOKEN is missing \u2014 photo upload skipped for ${prefix}/${file.originalname}`);
+    return null;
+  }
+  try {
+    const blob = await (0, import_blob.put)(`${prefix}/${Date.now()}-${file.originalname}`, file.buffer, {
+      access: "public",
+      contentType: file.mimetype,
+      token
+    });
+    return blob.url;
+  } catch (err) {
+    console.error("[blob] upload failed:", err);
+    return null;
+  }
+}
 var safetyRate = /* @__PURE__ */ new Map();
 function safetyRateOk(ip) {
   const now = Date.now();
@@ -1151,8 +1171,7 @@ async function registerRoutes(httpServer, app2) {
       shift,
       employeeId,
       correctiveActions: "",
-      photoPath: null,
-      // uploads disabled in this deployment — see TODO above
+      photoPath: await uploadToBlob(req.file, "delays"),
       createdByUser: req.session.role || "",
       createdAt: now.toISOString()
     });
@@ -1600,8 +1619,7 @@ async function registerRoutes(httpServer, app2) {
       name,
       month,
       day,
-      photoPath: ""
-      // uploads disabled in this deployment — see TODO above
+      photoPath: await uploadToBlob(req.file, "birthdays") || ""
     });
     res.status(201).json(created);
   });
@@ -1613,6 +1631,8 @@ async function registerRoutes(httpServer, app2) {
     if (req.body.name !== void 0) patch.name = String(req.body.name).trim();
     if (req.body.month !== void 0) patch.month = Number(req.body.month);
     if (req.body.day !== void 0) patch.day = Number(req.body.day);
+    const photoUrl = await uploadToBlob(req.file, "birthdays");
+    if (photoUrl) patch.photoPath = photoUrl;
     const b = await storage.updateBirthday(id, patch);
     res.json(b);
   });
