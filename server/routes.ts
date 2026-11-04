@@ -6,6 +6,7 @@ import ExcelJS from "exceljs";
 import multer from "multer";
 import { put } from "@vercel/blob";
 import { storage, bootstrap, sql } from "./storage";
+import { activeBirthdays, activeHolidays, dateWindow, isIsoDate, plantToday, EVENT_DAYS_BEFORE, EVENT_DAYS_AFTER } from "@shared/event-window";
 
 // ---- downtime math ----
 function parseDateTime(date: string, time: string): number | null {
@@ -837,6 +838,38 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.delete("/api/safety/concerns/:id", requireRole("plant_manager"), async (req, res) => {
     await storage.deleteSafetyConcern(parseInt(req.params.id, 10));
     res.json({ ok: true });
+  });
+
+  // ---- TV EVENT WINDOW (birthdays + holidays) ----
+  // GET /api/events/active[?date=YYYY-MM-DD][&before=N&after=N]
+  // Returns birthdays and holidays whose date falls inside the window around
+  // `date` (plant-local today by default). Default window = 1 day before,
+  // the day of, and 1 day after. `before`/`after` are clamped to 0–7.
+  app.get("/api/events/active", async (req, res) => {
+    const rawDate = req.query.date;
+    if (rawDate !== undefined && !isIsoDate(rawDate)) {
+      return res.status(400).json({ message: "date must be a valid YYYY-MM-DD calendar date." });
+    }
+    const clamp = (v: unknown, dflt: number) => {
+      if (v === undefined || v === "") return dflt;
+      const n = Number(v);
+      return Number.isInteger(n) ? Math.max(0, Math.min(7, n)) : NaN;
+    };
+    const before = clamp(req.query.before, EVENT_DAYS_BEFORE);
+    const after = clamp(req.query.after, EVENT_DAYS_AFTER);
+    if (Number.isNaN(before) || Number.isNaN(after)) {
+      return res.status(400).json({ message: "before/after must be whole numbers 0–7." });
+    }
+    const date = (rawDate as string | undefined) ?? plantToday();
+    const [bdays, hols] = await Promise.all([storage.listBirthdays(), storage.listHolidays()]);
+    res.json({
+      date,
+      before,
+      after,
+      window: dateWindow(date, before, after),
+      birthdays: activeBirthdays(bdays, date, before, after),
+      holidays: activeHolidays(hols, date, before, after),
+    });
   });
 
   // ---- BIRTHDAYS ----

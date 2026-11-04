@@ -97,8 +97,8 @@ export function useOpenConcerns(refetchInterval?: number) {
     refetchInterval,
   });
 }
-export function useBirthdays() {
-  return useQuery<Birthday[]>({ queryKey: ["/api/birthdays"], queryFn: jsonGetter("/api/birthdays") });
+export function useBirthdays(refetchInterval?: number) {
+  return useQuery<Birthday[]>({ queryKey: ["/api/birthdays"], queryFn: jsonGetter("/api/birthdays"), refetchInterval });
 }
 export function useUpcomingBirthdays(refetchInterval?: number) {
   return useQuery<UpcomingBirthday[]>({
