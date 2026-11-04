@@ -835,6 +835,82 @@ async function bootstrap() {
   }
 }
 
+// shared/event-window.ts
+var PLANT_TIME_ZONE = "America/Chicago";
+var EVENT_DAYS_BEFORE = 1;
+var EVENT_DAYS_AFTER = 1;
+var ISO_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+var DAY_MS = 864e5;
+function isIsoDate(s) {
+  if (typeof s !== "string") return false;
+  const m = ISO_RE.exec(s);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d;
+}
+function plantToday(now = /* @__PURE__ */ new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: PLANT_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(now);
+}
+function toUtcMs(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+function fromUtcMs(ms) {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+function addDays(iso, days) {
+  return fromUtcMs(toUtcMs(iso) + days * DAY_MS);
+}
+function diffDays(eventIso, todayIso) {
+  return Math.round((toUtcMs(eventIso) - toUtcMs(todayIso)) / DAY_MS);
+}
+function dateWindow(centerIso, before = EVENT_DAYS_BEFORE, after = EVENT_DAYS_AFTER) {
+  const out = [];
+  for (let i = -before; i <= after; i++) out.push(addDays(centerIso, i));
+  return out;
+}
+function isInEventWindow(eventIso, todayIso, before = EVENT_DAYS_BEFORE, after = EVENT_DAYS_AFTER) {
+  const d = diffDays(eventIso, todayIso);
+  return d <= before && d >= -after;
+}
+function isLeap2(y) {
+  return y % 4 === 0 && y % 100 !== 0 || y % 400 === 0;
+}
+function birthdayDateInYear(month, day, year) {
+  const d = month === 2 && day === 29 && !isLeap2(year) ? 28 : day;
+  return `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+function birthdayOffset(month, day, todayIso) {
+  const y = Number(todayIso.slice(0, 4));
+  let best = Infinity;
+  for (const yr of [y - 1, y, y + 1]) {
+    const off = diffDays(birthdayDateInYear(month, day, yr), todayIso);
+    if (Math.abs(off) < Math.abs(best)) best = off;
+  }
+  return best;
+}
+function windowTag(offset) {
+  return offset === 0 ? "today" : offset > 0 ? "before" : "after";
+}
+function activeHolidays(list, todayIso, before = EVENT_DAYS_BEFORE, after = EVENT_DAYS_AFTER) {
+  return list.filter((h) => isIsoDate(h.date) && isInEventWindow(h.date, todayIso, before, after)).map((h) => {
+    const offset = diffDays(h.date, todayIso);
+    return { ...h, offset, tag: windowTag(offset) };
+  }).sort((a, b) => Math.abs(a.offset) - Math.abs(b.offset) || a.offset - b.offset);
+}
+function activeBirthdays(list, todayIso, before = EVENT_DAYS_BEFORE, after = EVENT_DAYS_AFTER) {
+  return list.map((b) => {
+    const offset = birthdayOffset(b.month, b.day, todayIso);
+    return { ...b, offset, tag: windowTag(offset), date: addDays(todayIso, offset) };
+  }).filter((b) => b.offset <= before && b.offset >= -after).sort((a, b) => Math.abs(a.offset) - Math.abs(b.offset) || a.offset - b.offset);
+}
+
 // server/routes.ts
 function parseDateTime(date, time) {
   if (!date) return null;
@@ -1605,6 +1681,32 @@ async function registerRoutes(httpServer, app2) {
   app2.delete("/api/safety/concerns/:id", requireRole("plant_manager"), async (req, res) => {
     await storage.deleteSafetyConcern(parseInt(req.params.id, 10));
     res.json({ ok: true });
+  });
+  app2.get("/api/events/active", async (req, res) => {
+    const rawDate = req.query.date;
+    if (rawDate !== void 0 && !isIsoDate(rawDate)) {
+      return res.status(400).json({ message: "date must be a valid YYYY-MM-DD calendar date." });
+    }
+    const clamp = (v, dflt) => {
+      if (v === void 0 || v === "") return dflt;
+      const n = Number(v);
+      return Number.isInteger(n) ? Math.max(0, Math.min(7, n)) : NaN;
+    };
+    const before = clamp(req.query.before, EVENT_DAYS_BEFORE);
+    const after = clamp(req.query.after, EVENT_DAYS_AFTER);
+    if (Number.isNaN(before) || Number.isNaN(after)) {
+      return res.status(400).json({ message: "before/after must be whole numbers 0\u20137." });
+    }
+    const date = rawDate ?? plantToday();
+    const [bdays, hols] = await Promise.all([storage.listBirthdays(), storage.listHolidays()]);
+    res.json({
+      date,
+      before,
+      after,
+      window: dateWindow(date, before, after),
+      birthdays: activeBirthdays(bdays, date, before, after),
+      holidays: activeHolidays(hols, date, before, after)
+    });
   });
   app2.get("/api/birthdays", async (_req, res) => res.json(await storage.listBirthdays()));
   app2.get("/api/birthdays/upcoming", async (_req, res) => res.json(await storage.getUpcomingBirthdays(30)));

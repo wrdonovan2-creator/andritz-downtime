@@ -327,7 +327,12 @@
     "holidayTitle": "FERIADO",
     "holidayStaySafe": "Que tengan un feriado seguro y feliz, equipo.",
     "holidayFromTeam": "— De todos en ANDRITZ Metals V403",
-    "greetingDate": ""
+    "greetingDate": "",
+    "birthdayWhen": {
+      "before": "Mañana",
+      "today": "Hoy",
+      "after": "Ayer"
+    }
   },
   "misc": {
     "year": "Año",

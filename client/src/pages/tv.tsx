@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { QRCodeSVG } from "qrcode.react";
-import { useDashboard, useDelays, useByReason, useToolbox, useUpcomingBirthdays, useRecentResponses, useOpenConcerns, useHolidays, useProductionOrders, useOtd, useProductivity } from "@/lib/hooks";
+import { activeBirthdays, activeHolidays, isIsoDate, plantToday, type WindowTag } from "@shared/event-window";
+import { useDashboard, useDelays, useByReason, useToolbox, useBirthdays, useRecentResponses, useOpenConcerns, useHolidays, useProductionOrders, useOtd, useProductivity } from "@/lib/hooks";
 import { useLang } from "@/lib/lang";
 import { fmtMoney, fmtHours, fmtInt } from "@/i18n";
 import { assetUrl } from "@/lib/api";
@@ -17,17 +18,25 @@ const SAFETY_URL = "https://shd.pplx.app/#/safety";
 // Concerns per slide when there are multiple open safety concerns.
 const CONCERNS_PER_SLIDE = 3;
 
-// Holiday window — show the holiday slide from 3 days BEFORE through 1 day AFTER.
-const HOLIDAY_DAYS_BEFORE = 3;
-const HOLIDAY_DAYS_AFTER = 1;
+// Birthday + holiday window — both slides show for 3 calendar days: the day
+// before, the day of, and the day after (see shared/event-window.ts, which
+// the /api/events/active endpoint also uses).
 
 // TEST OVERRIDES from URL search params:
 //   ?forceHoliday=YYYY-MM-DD  — force holiday slide to include this date
+//   ?asOf=YYYY-MM-DD          — evaluate the birthday/holiday window as if today were this date
 //   ?slide=<key>              — pin the TV to a single slide (no rotation)
 function getForceHolidayDate(): string | null {
   if (typeof window === "undefined") return null;
   const p = new URLSearchParams(window.location.search);
   return p.get("forceHoliday");
+}
+function getAsOfDate(): string {
+  if (typeof window !== "undefined") {
+    const v = new URLSearchParams(window.location.search).get("asOf");
+    if (isIsoDate(v)) return v;
+  }
+  return plantToday();
 }
 function getPinnedSlide(): string | null {
   if (typeof window === "undefined") return null;
@@ -98,7 +107,9 @@ export default function Tv() {
   const { data: delays } = useDelays(fast as any);
   const { data: reasons } = useByReason(fast as any);
   const { data: toolbox } = useToolbox(slow as any);
-  const { data: birthdays } = useUpcomingBirthdays(slow as any);
+  // Full birthday list; the window is evaluated locally on every render so the
+  // slide still turns on/off correctly when background polling is paused.
+  const { data: birthdays } = useBirthdays(slow as any);
   const { data: responses } = useRecentResponses(slow as any);
   const { data: openConcerns } = useOpenConcerns(fast as any);
   const { data: allHolidays } = useHolidays();
@@ -106,8 +117,12 @@ export default function Tv() {
   const { data: otd } = useOtd(new Date().getFullYear(), slow as any);
   const { data: productivity } = useProductivity(slow as any);
 
-  // Birthday slide only appears when someone has a birthday TODAY.
-  const hasBirthdayToday = (birthdays ?? []).some((b) => b.isToday);
+  // Plant-local "today" (or ?asOf= override) drives both event windows.
+  const todayIso = getAsOfDate();
+
+  // Birthday slide appears the day before, the day of, and the day after.
+  const bdayWindow = activeBirthdays(birthdays ?? [], todayIso);
+  const hasBirthdayInWindow = bdayWindow.length > 0;
 
   // Chunk open safety concerns into pages of CONCERNS_PER_SLIDE.
   const openList = openConcerns ?? [];
@@ -124,16 +139,8 @@ export default function Tv() {
       const found = allHolidays.find((h) => h.date === forceDate);
       if (found) return found;
     }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    for (const h of allHolidays) {
-      const [y, m, d] = h.date.split("-").map((x) => parseInt(x, 10));
-      const hd = new Date(y, m - 1, d);
-      hd.setHours(0, 0, 0, 0);
-      const diffDays = Math.round((hd.getTime() - today.getTime()) / 86400000);
-      if (diffDays >= -HOLIDAY_DAYS_AFTER && diffDays <= HOLIDAY_DAYS_BEFORE) return h;
-    }
-    return null;
+    // Nearest holiday within day-before / day-of / day-after.
+    return activeHolidays(allHolidays, todayIso)[0] ?? null;
   })();
 
   // Build an ordered list of slide keys. Static slides + conditional dynamic ones.
@@ -152,7 +159,7 @@ export default function Tv() {
     "productivity",
     "toolbox",
     ...(activeHoliday ? ["holiday"] : []),
-    ...(hasBirthdayToday ? ["birthday"] : []),
+    ...(hasBirthdayInWindow ? ["birthday"] : []),
     ...concernPages.map((_, i) => `openConcerns:${i}`),
     "safety",
   ];
@@ -245,8 +252,7 @@ export default function Tv() {
   const currentShown = currentSorted.slice(0, 4);
   const currentExtra = Math.max(0, currentSorted.length - 4);
 
-  const bdayList = birthdays ?? [];
-  const bdayToday = bdayList.filter((b) => b.isToday);
+  const bdayToday = bdayWindow;
   const recentResponded = (responses ?? []).slice(0, 2);
 
   return (
@@ -708,7 +714,7 @@ export default function Tv() {
           );
         })()}
 
-        {/* SLIDE 7 — BIRTHDAYS (today only; slide is skipped from rotation when empty) */}
+        {/* SLIDE 7 — BIRTHDAYS (day before / day of / day after; skipped from rotation when empty) */}
         {slide === "birthday" && bdayToday.length > 0 && (
           <BirthdaySlide people={bdayToday} lang={lang} t={t} />
         )}
@@ -1040,7 +1046,7 @@ function HolidaySlide({ holiday, lang, t }: { holiday: { date: string; labelEn: 
  * Floating balloons, a birthday cake with animated candles, confetti
  * pieces falling gently. Warm gold + pink accents.
  * ================================================================== */
-function BirthdaySlide({ people, lang, t }: { people: { id: number; name: string; photoPath: string }[]; lang: "en" | "es"; t: (k: string, opts?: any) => string }) {
+function BirthdaySlide({ people, lang, t }: { people: { id: number; name: string; photoPath: string; tag: WindowTag }[]; lang: "en" | "es"; t: (k: string, opts?: any) => string }) {
   // Deterministic decorations — seeded values so re-renders are stable during a slide’s life.
   const balloonColors = ["#FF3D8A", "#FFB800", "#4FC3F7", "#8E5CFF", "#FF7A45", "#3DD68C"];
   const balloons = Array.from({ length: 14 }).map((_, i) => {
@@ -1211,6 +1217,9 @@ function BirthdaySlide({ people, lang, t }: { people: { id: number; name: string
                 )}
               </div>
               <div className="mt-5 text-4xl font-black leading-tight text-white">{b.name}</div>
+              <div className="mt-2 text-xl font-bold uppercase tracking-widest text-white/70" data-testid={`birthday-when-${b.id}`}>
+                {t(`tv.birthdayWhen.${b.tag}`)}
+              </div>
             </div>
           ))}
         </div>
