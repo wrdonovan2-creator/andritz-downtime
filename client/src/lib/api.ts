@@ -15,7 +15,7 @@ export async function apiUpload(url: string, form: FormData): Promise<Response> 
 // Resolve a stored path or absolute Blob URL to a usable image src.
 export function assetUrl(p?: string | null): string | undefined {
   if (!p) return undefined;
-  if (p.startsWith("http://") || p.startsWith("https://")) return p;
+  if (p.startsWith("http://") || p.startsWith("https://") || p.startsWith("data:")) return p;
   return `${API_BASE}${p}`;
 }
 

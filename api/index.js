@@ -1783,6 +1783,17 @@ async function registerRoutes(httpServer, app2) {
     if (req.body?.presenter !== void 0) patch.presenter = String(req.body.presenter);
     if (req.body?.notes !== void 0) patch.notes = String(req.body.notes);
     if (req.body?.weekOf !== void 0) patch.weekOf = String(req.body.weekOf);
+    if (req.body?.removeImage) patch.imagePath = "";
+    const imageData = req.body?.imageData;
+    if (typeof imageData === "string" && /^data:image\/(png|jpe?g|webp|gif);base64,/.test(imageData)) {
+      const m = imageData.match(/^data:(image\/[a-z+]+);base64,(.*)$/);
+      let url = null;
+      if (m) {
+        const ext = m[1].split("/")[1].replace("jpeg", "jpg");
+        url = await uploadToBlob({ buffer: Buffer.from(m[2], "base64"), originalname: `toolbox.${ext}`, mimetype: m[1] }, "toolbox");
+      }
+      patch.imagePath = url || imageData;
+    }
     const tb = await storage.updateToolboxTalk(patch);
     res.json(tb);
   });

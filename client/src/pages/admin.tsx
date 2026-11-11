@@ -958,6 +958,24 @@ function ToolboxSection() {
     setInitialized(true);
   }
 
+  async function removeImage() {
+    setBusy(true);
+    try {
+      const res = await fetch(`${assetUrl("/api/toolbox")}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ removeImage: true }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      queryClient.invalidateQueries({ queryKey: ["/api/toolbox"] });
+      toast({ description: t("toast.toolboxSaved") });
+    } catch {
+      toast({ description: t("toast.error") });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function save() {
     setBusy(true);
     try {
@@ -965,13 +983,14 @@ function ToolboxSection() {
       // which broke the previous multipart/form-data + multer setup (every
       // field arrived empty). Image uploads are disabled in this deployment
       // regardless (no persistent filesystem on Vercel).
-      const payload = {
+      const payload: Record<string, unknown> = {
         noteType,
         title: title.trim(),
         presenter: presenter.trim(),
         notes: notes.trim(),
         weekOf: weekOf || mondayOfThisWeek(),
       };
+      if (image) payload.imageData = await compressImage(image);
       const res = await fetch(`${assetUrl("/api/toolbox")}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -1065,6 +1084,11 @@ function ToolboxSection() {
               <p className="text-[11px] text-muted-foreground">{t("admin.toolboxNoImage")}</p>
             )}
             <Input type="file" accept="image/*" onChange={(e) => setImage(e.target.files?.[0] ?? null)} className="h-9 file:mr-2 file:text-xs" data-testid="input-toolbox-image" />
+            {toolbox?.imagePath && !image && (
+              <Button type="button" size="sm" variant="outline" className="mt-2" onClick={removeImage} disabled={busy} data-testid="button-remove-toolbox-image">
+                Remove image
+              </Button>
+            )}
           </div>
           <Button size="sm" onClick={save} disabled={busy} data-testid="button-save-toolbox">
             {t("admin.toolboxSave")}
@@ -1073,4 +1097,31 @@ function ToolboxSection() {
       )}
     </Section>
   );
+}
+
+// Shrink a photo to max 1600px JPEG so it fits Vercel's request-size limit.
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("decode failed"));
+      img.onload = () => {
+        const max = 1600;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("no canvas"));
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
 }

@@ -1051,6 +1051,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (req.body?.presenter !== undefined) patch.presenter = String(req.body.presenter);
     if (req.body?.notes !== undefined) patch.notes = String(req.body.notes);
     if (req.body?.weekOf !== undefined) patch.weekOf = String(req.body.weekOf);
+    // Image arrives as a compressed base64 data URL in the JSON body.
+    // Stored in Vercel Blob when configured; otherwise kept inline in the DB.
+    if (req.body?.removeImage) patch.imagePath = "";
+    const imageData = req.body?.imageData;
+    if (typeof imageData === "string" && /^data:image\/(png|jpe?g|webp|gif);base64,/.test(imageData)) {
+      const m = imageData.match(/^data:(image\/[a-z+]+);base64,(.*)$/);
+      let url: string | null = null;
+      if (m) {
+        const ext = m[1].split("/")[1].replace("jpeg", "jpg");
+        url = await uploadToBlob({ buffer: Buffer.from(m[2], "base64"), originalname: `toolbox.${ext}`, mimetype: m[1] }, "toolbox");
+      }
+      patch.imagePath = url || imageData;
+    }
     const tb = await storage.updateToolboxTalk(patch);
     res.json(tb);
   });
