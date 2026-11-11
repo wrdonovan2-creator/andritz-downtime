@@ -723,8 +723,9 @@ var DatabaseStorage = class {
       const bDoy = dayOfYear(b.month, b.day, now.getFullYear());
       let diff = bDoy - todayDoy;
       if (diff < 0) diff += yearLen;
-      return { ...b, daysUntil: diff, isToday: diff === 0 };
-    }).filter((b) => b.daysUntil <= days).sort((a, b) => a.daysUntil - b.daysUntil);
+      const onTv = diff === 0 || diff === 1 || diff === yearLen - 1;
+      return { ...b, daysUntil: diff, isToday: diff === 0, onTv };
+    }).filter((b) => b.daysUntil <= days || b.onTv).sort((a, b) => a.daysUntil - b.daysUntil);
   }
   // ---- TOOLBOX TALK (single row id=1) ----
   async getToolboxTalk() {

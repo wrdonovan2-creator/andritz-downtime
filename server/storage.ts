@@ -327,7 +327,7 @@ export interface IStorage {
   deleteBirthday(id: number): Promise<void>;
   getBirthdaysNext7Days(): Promise<Birthday[]>;
   getBirthdaysThisMonth(): Promise<Birthday[]>;
-  getUpcomingBirthdays(days: number): Promise<(Birthday & { daysUntil: number; isToday: boolean })[]>;
+  getUpcomingBirthdays(days: number): Promise<(Birthday & { daysUntil: number; isToday: boolean; onTv: boolean })[]>;
   // Toolbox talk
   getToolboxTalk(): Promise<ToolboxTalk | undefined>;
   updateToolboxTalk(patch: Partial<InsertToolboxTalk>): Promise<ToolboxTalk>;
@@ -569,9 +569,11 @@ export class DatabaseStorage implements IStorage {
         const bDoy = dayOfYear(b.month, b.day, now.getFullYear());
         let diff = bDoy - todayDoy;
         if (diff < 0) diff += yearLen; // wrap to next year
-        return { ...b, daysUntil: diff, isToday: diff === 0 };
+        // TV window: day before, day of, and day after the birthday.
+        const onTv = diff === 0 || diff === 1 || diff === yearLen - 1;
+        return { ...b, daysUntil: diff, isToday: diff === 0, onTv };
       })
-      .filter((b) => b.daysUntil <= days)
+      .filter((b) => b.daysUntil <= days || b.onTv)
       .sort((a, b) => a.daysUntil - b.daysUntil);
   }
 

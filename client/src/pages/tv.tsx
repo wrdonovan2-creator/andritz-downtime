@@ -17,8 +17,8 @@ const SAFETY_URL = "https://shd.pplx.app/#/safety";
 // Concerns per slide when there are multiple open safety concerns.
 const CONCERNS_PER_SLIDE = 3;
 
-// Holiday window — show the holiday slide from 3 days BEFORE through 1 day AFTER.
-const HOLIDAY_DAYS_BEFORE = 3;
+// Holiday window — show the holiday slide from 1 day BEFORE through 1 day AFTER.
+const HOLIDAY_DAYS_BEFORE = 1;
 const HOLIDAY_DAYS_AFTER = 1;
 
 // TEST OVERRIDES from URL search params:
@@ -106,8 +106,8 @@ export default function Tv() {
   const { data: otd } = useOtd(new Date().getFullYear(), slow as any);
   const { data: productivity } = useProductivity(slow as any);
 
-  // Birthday slide only appears when someone has a birthday TODAY.
-  const hasBirthdayToday = (birthdays ?? []).some((b) => b.isToday);
+  // Birthday slide shows the day before, day of, and day after a birthday.
+  const hasBirthdayToday = (birthdays ?? []).some((b: any) => b.onTv ?? b.isToday);
 
   // Chunk open safety concerns into pages of CONCERNS_PER_SLIDE.
   const openList = openConcerns ?? [];
@@ -246,7 +246,7 @@ export default function Tv() {
   const currentExtra = Math.max(0, currentSorted.length - 4);
 
   const bdayList = birthdays ?? [];
-  const bdayToday = bdayList.filter((b) => b.isToday);
+  const bdayToday = bdayList.filter((b: any) => b.onTv ?? b.isToday);
   const recentResponded = (responses ?? []).slice(0, 2);
 
   return (
